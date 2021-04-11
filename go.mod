@@ -10,4 +10,4 @@ require (
 )
 
 // Replace this
-replace tapestry => /path/to/your/tapestry/implementation/root/folder
+replace tapestry => /tapestry-ta-implementation-master

@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"bytes"
+
 	"github.com/hashicorp/go-msgpack/codec"
 )
 

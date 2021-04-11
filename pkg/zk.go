@@ -1,9 +1,9 @@
 package pkg
 
 import (
-	"fmt"
-	"github.com/samuel/go-zookeeper/zk"
 	"time"
+
+	"github.com/samuel/go-zookeeper/zk"
 )
 
 // connectZk sets up the zookeeper connection

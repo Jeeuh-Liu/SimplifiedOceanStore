@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	tapestry "tapestry/pkg"
 	"time"
 )
 
