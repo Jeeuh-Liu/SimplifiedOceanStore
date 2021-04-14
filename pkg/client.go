@@ -44,15 +44,15 @@ type Client interface {
 }
 
 type fileInfo struct {
-	Filename   string
+	// Filename   string
 	ReadCache  map[int][]byte //maintain a map from block num -> bytes or tapestry ID() TODO
 	WriteCache map[int][]byte //maintain a map from block num -> bytes or tapestry ID() TODO
 	Flush      bool
 }
 type puddleStoreClient struct {
 	Tap       *Tapestry
+	Info      map[int]fileInfo
 	fdCounter int
-	files     map[int]fileInfo
 }
 
 //Constructor
@@ -73,7 +73,6 @@ func (p *puddleStoreClient) isFileExist(path string) (bool, error) {
 	}
 }
 
-//when to publish the file
 func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 	//lock
 	fd := p.getFd()
@@ -85,26 +84,35 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 		if !create {
 			return fd, fmt.Errorf("create == false && exist == false, err!")
 		} else {
-			//create file logic
+			data, err := encodeInode(newInode())
+			if err != nil {
+				return fd, err
+			}
+			//create an ephemeral znode??? set corresponding flags and acl
+			//it will return a path in zookeeper, will we use it?
+			_, err = p.Tap.zk.Create(path, data, flags, acl)
+			if err != nil {
+				return fd, err
+			}
 		}
 	}
-	//open
-	//unlock
+	//I guess open means prepare fileInfo based on write: map[fd] = newFileInfo()
 }
 
 func (p *puddleStoreClient) Close(fd int) error {
-	//lock
+	//if the map p.Info does not contains fd, return error
+	//if flush is not needed unlock and return nil
+	//update metadata in zookeeper
 	//unlock
+	//salt the GUID and publish it
 }
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
-	//lock
-	//unlock
+	//should return a copy of original array
 }
 
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
-	//lock
-	//unlock
+	//should return a copy of original array
 }
 
 func (p *puddleStoreClient) Mkdir(path string) error {

@@ -4,9 +4,13 @@ import (
 	tapestry "tapestry/pkg"
 )
 
-type Inode struct {
+type inode struct {
 	IsDir    bool
 	Filename string
 	Size     uint64
 	Blocks   map[int]tapestry.ID //block number to GUID?
+}
+
+//initially I bet the file should have at least one block
+func newInode() inode {
 }
