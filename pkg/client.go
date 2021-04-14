@@ -1,5 +1,7 @@
 package pkg
 
+import "fmt"
+
 // Client is a puddlestore client interface that will communicate with puddlestore nodes
 type Client interface {
 	// `Open` opens a file and returns a file descriptor. If the `create` is true and the
@@ -39,4 +41,84 @@ type Client interface {
 
 	// Release zk connection. Students don't have this and may add one
 	Exit()
+}
+
+type fileInfo struct {
+	Filename   string
+	ReadCache  map[int][]byte //maintain a map from block num -> bytes or tapestry ID() TODO
+	WriteCache map[int][]byte //maintain a map from block num -> bytes or tapestry ID() TODO
+	Flush      bool
+}
+type puddleStoreClient struct {
+	Tap       *Tapestry
+	fdCounter int
+	files     map[int]fileInfo
+}
+
+//Constructor
+
+func (p *puddleStoreClient) getFd() int {
+	// if map FileDescripto does not contain fdCounter, return a copy of fdCounter, and increment fdCounter
+	// otherwise, increment fdCounter until the map does not contain fdCounter, return its copy and increment it
+	// round if necessary
+
+}
+
+func (p *puddleStoreClient) isFileExist(path string) (bool, error) {
+	rlt, _, err := p.Tap.zk.Exists(path)
+	if err != nil {
+		return rlt, err
+	} else {
+		return rlt, nil
+	}
+}
+
+//when to publish the file
+func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
+	//lock
+	fd := p.getFd()
+	exist, err := p.isFileExist(path)
+	if err != nil {
+		return fd, err
+	}
+	if !exist {
+		if !create {
+			return fd, fmt.Errorf("create == false && exist == false, err!")
+		} else {
+			//create file logic
+		}
+	}
+	//open
+	//unlock
+}
+
+func (p *puddleStoreClient) Close(fd int) error {
+	//lock
+	//unlock
+}
+
+func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
+	//lock
+	//unlock
+}
+
+func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
+	//lock
+	//unlock
+}
+
+func (p *puddleStoreClient) Mkdir(path string) error {
+
+}
+
+func (p *puddleStoreClient) Remove(path string) error {
+	//lock is not required for Remove
+}
+
+func (p *puddleStoreClient) List(path string) ([]string, error) {
+
+}
+
+func (p *puddleStoreClient) Exit() {
+
 }

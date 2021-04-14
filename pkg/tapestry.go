@@ -20,6 +20,15 @@ func NewTapestry(tap *tapestry.Node, zkAddr string) (*Tapestry, error) {
 		return nil, err
 	}
 	Tap := Tapestry{tap: tap, zk: zkConn}
+	//use that session to create an Ephemeral file, then when the node fails the session will also disappear.
+	//Clients can then watch these znodes to determine which tapestry nodes are active or not.
+	//so you can use zk watches to track your membership changes
+	path := Tap.tap.ID()
+	data := []byte(Tap.tap.Node.Address)
+	_, err = CreateEphSeq(zkConn, path, data)
+	if err != nil {
+		return nil, err
+	}
 	return &Tap, nil
 }
 
