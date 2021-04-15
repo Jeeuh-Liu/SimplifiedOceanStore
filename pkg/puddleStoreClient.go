@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 
+	tapestry "tapestry/pkg"
+
 	"github.com/samuel/go-zookeeper/zk"
 )
 
@@ -134,10 +136,13 @@ func (p *puddleStoreClient) Close(fd int) error {
 		//unlock
 		return nil
 	}
-	//update metadata in zookeeper, then unlcok
-	//salt the GUID and publish it -> GUID_X1, GUID_X2
-	//need timeout to make sure at least one is published
+	if len(info.Modified) != 0 {
+		//update metadata in zookeeper, then unlcok
+		//salt the GUID and publish it -> GUID_X1, GUID_X2
+		//need timeout to make sure at least one is published
+	}
 	//clear fd
+	delete(p.info, fd)
 	return nil
 }
 
@@ -153,9 +158,33 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	if offset+size < info.Inode.Size {
 		end = (offset + size) / DefaultConfig().BlockSize
 	}
+	children, _, eventChan, err := p.Conn.ChildrenW("/tapestry")
+	if err != nil {
+		//unlock
+		return []byte{}, fmt.Errorf("Get ChildrenW err")
+	}
+	//generate a random path from children
+	child := children[0]
+	remote, err := p.getRandomRemote(child)
+	if err != nil {
+		//unlock
+		return []byte{}, fmt.Errorf("Unexpected err")
+	}
 	for ; start <= end; start++ {
-		//if cached, read locally
-		//otherwise, request the data, only one is sufficient
+		//TODO: if cached, read locally
+		select {
+		case event := <-eventChan:
+			if event.Type == zk.EventNodeCreated {
+				children = append(children, event.Path)
+			}
+			if event.Type == zk.EventNodeDeleted {
+				//TODO: remove event.Path
+				if event.Path == child {
+					//TODO: need a new membership server
+				}
+			}
+		}
+		//TODO: otherwise, request the data, only one is sufficient, how to get the data?
 	}
 	return nil, nil
 }
@@ -190,10 +219,12 @@ func (p *puddleStoreClient) Mkdir(path string) error {
 func (p *puddleStoreClient) Remove(path string) error {
 	//lock is not required for Remove
 	//if it is a dir, it should recursively remove its descendents
+	//TODO
 	return nil
 }
 
 func (p *puddleStoreClient) List(path string) ([]string, error) {
+	//TODO
 	return nil, nil
 }
 
@@ -203,7 +234,32 @@ func (p *puddleStoreClient) Exit() {
 	//cleanup (like all the opened fd) and all subsequent calls should return an error
 }
 
-func (p *puddleStoreClient) getGate() string {
+func (p *puddleStoreClient) getRandomRemote(path string) (*tapestry.RemoteNode, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
-	return ""
+	//TODO: get a random path
+	var remote tapestry.RemoteNode
+	id, err := p.getTapID(path)
+	if err != nil {
+		return &remote, err
+	}
+	addr, err := p.getTapAddr(path)
+	if err != nil {
+		return &remote, err
+	}
+	remote = tapestry.RemoteNode{
+		ID:      id,
+		Address: addr,
+	}
+	return &remote, nil
+}
+
+func (p *puddleStoreClient) getTapID(path string) (tapestry.ID, error) {
+	//TODO: get the ID from path := "/tapestry/node-000" + Tap.tap.ID()
+	id, err := tapestry.ParseID(path)
+	return id, err
+}
+
+func (p *puddleStoreClient) getTapAddr(path string) (string, error) {
+	addr, _, err := p.Conn.Get(path)
+	return string(addr), err
 }
