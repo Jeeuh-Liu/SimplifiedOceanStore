@@ -245,18 +245,60 @@ func (p *puddleStoreClient) Remove(path string) error {
 	//lock is not required for Remove
 	//if it is a dir, it should recursively remove its descendents
 	//TODO
+	exist, err := p.isFileExist(path)
+	if err != nil {
+		return err
+	}
+	if !exist {
+		return fmt.Errorf("Not exist")
+	}
+	//lock
+	data, state, err := p.Conn.Get(path)
+	if err != nil {
+		//unlock
+		return err
+	}
+	node, err := decodeInode(data)
+	if err != nil {
+		//unlock
+		return err
+	}
+	//unlock
+	if node.IsDir {
+		//locked?
+		children, _, err := p.Conn.Children(path)
+		if err != nil {
+			return err
+		}
+		for _, s := range children {
+			p.Remove(s)
+		}
+		p.Conn.Delete(path, state.Version) //version
+	} else {
+		//locked?
+		//lock
+		p.Conn.Delete(path, state.Version)
+		//unlock
+	}
+
 	return nil
 }
 
 func (p *puddleStoreClient) List(path string) ([]string, error) {
 	//TODO
+	exist, err := p.isFileExist(path)
+	if err != nil {
+		return nil, err
+	}
+	if !exist {
+		return nil, fmt.Errorf("Not exist")
+	}
 	children, _, err := p.Conn.Children(path)
 	if err != nil {
-		return children, err
+		return nil, err
 	}
 	return children, nil
 }
-
 func (p *puddleStoreClient) Exit() {
 	p.Conn.Close()
 	p.info = map[int]fileInfo{}
