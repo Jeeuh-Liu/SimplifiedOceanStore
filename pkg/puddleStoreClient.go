@@ -112,7 +112,6 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 		//unlock
 		return fd, err
 	}
-	// TODO when path is an dir, it should return err
 	if node.IsDir {
 		return fd, fmt.Errorf("it's a directory")
 	}
@@ -172,12 +171,12 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		//unlock
 		return []byte{}, fmt.Errorf("Get ChildrenW err")
 	}
-	//TODO:generate a random path from children, replace child in line 176
+	//TODO:generate a random path from children, replace child below
 	child := children[0]
-	remote, err := p.getRandomRemote(child)
+	remote, err := p.ConnectRemote(child)
 	if err != nil {
 		//unlock
-		return []byte{}, fmt.Errorf("Unexpected err")
+		return []byte{}, err
 	}
 	var rlt []byte
 	for ; start <= end; start++ {
@@ -186,7 +185,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 			rlt = append(rlt, data...)
 			continue
 		}
-		//watch event
+		//watch event ???
 		select {
 		case event := <-eventChan:
 			if event.Type == zk.EventNodeCreated {
@@ -196,10 +195,20 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 				//TODO: remove event.Path from children
 				if event.Path == child {
 					//TODO: need a new membership server
+					remote, err = p.ConnectRemote(child)
+					if err != nil {
+						//unlock
+						return []byte{}, err
+					}
 				}
 			}
 		}
-		//TODO: otherwise, request the data, only one is sufficient?, how to get the data?
+		data, err := remote.Get(info.Filename)
+		if err != nil {
+			//unlock
+			return []byte{}, err
+		}
+		rlt = append(rlt, data...)
 	}
 	return rlt, nil
 }
@@ -216,16 +225,11 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		//should we unlock?
 		return fmt.Errorf("write == false")
 	}
-	if offset > info.Inode.Size {
-		//read and compare byte by byte?
-		//if offset is greater than size, pad with 0
-	}
-	//replace the blocks that the user writes to.
-	//salt the GUID and publish it -> GUID_X1, GUID_X2
-	//need timeout to make sure at least one is published
-	//Tapestry has no delete function, so you have all the different versions of a block in Tapestry
-	//but only the most recent version will be included in the iNode, do we need to fetch all the replica?
-	//cache the write
+	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
+	// write data []byte
+	// for each block, salt DefaultConfig().NumReplicas times and publish it
+	// make sure at least one is published
+	// cache the write
 	return nil
 }
 
@@ -244,10 +248,13 @@ func (p *puddleStoreClient) Remove(path string) error {
 	return nil
 }
 
-//is it recursive?
 func (p *puddleStoreClient) List(path string) ([]string, error) {
 	//TODO
-	return nil, nil
+	children, _, err := p.Conn.Children(path)
+	if err != nil {
+		return children, err
+	}
+	return children, nil
 }
 
 func (p *puddleStoreClient) Exit() {
@@ -256,31 +263,12 @@ func (p *puddleStoreClient) Exit() {
 	//cleanup (like all the opened fd) and all subsequent calls should return an error
 }
 
-func (p *puddleStoreClient) getRandomRemote(path string) (*tapestry.RemoteNode, error) {
+func (p *puddleStoreClient) ConnectRemote(path string) (*tapestry.Client, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
-	var remote tapestry.RemoteNode
-	id, err := p.getTapID(path)
-	if err != nil {
-		return &remote, err
-	}
-	addr, err := p.getTapAddr(path)
-	if err != nil {
-		return &remote, err
-	}
-	remote = tapestry.RemoteNode{
-		ID:      id,
-		Address: addr,
-	}
-	return &remote, nil
-}
-
-func (p *puddleStoreClient) getTapID(path string) (tapestry.ID, error) {
-	//TODO: get the ID from path := "/tapestry/node-000" + Tap.tap.ID()
-	id, err := tapestry.ParseID(path)
-	return id, err
-}
-
-func (p *puddleStoreClient) getTapAddr(path string) (string, error) {
 	addr, _, err := p.Conn.Get(path)
-	return string(addr), err
+	if err != nil {
+		return nil, err
+	}
+	remote, err := tapestry.Connect(string(addr))
+	return remote, nil
 }
