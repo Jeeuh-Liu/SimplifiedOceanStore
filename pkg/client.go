@@ -75,11 +75,13 @@ func (p *puddleStoreClient) isFileExist(path string) (bool, error) {
 
 func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 	//lock
-	fd := p.getFd()
+	//todo when path is an dir, it should return err
+	fd := -1
 	exist, err := p.isFileExist(path)
 	if err != nil {
 		return fd, err
 	}
+	//TODO: Creating file without existing directory should throw an error
 	if !exist {
 		if !create {
 			return fd, fmt.Errorf("create == false && exist == false, err!")
@@ -96,8 +98,13 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 			}
 		}
 	}
+	fd = p.getFd()
 	//I guess open means prepare fileInfo based on write: map[fd] = newFileInfo()
 }
+
+//load balancing: It's better to have client gets a random node each time when need to interact.
+//You should retry a few times, between 3 to 10 times if anything fail
+//read own write
 
 func (p *puddleStoreClient) Close(fd int) error {
 	//if the map p.Info does not contains fd, return error
@@ -105,14 +112,23 @@ func (p *puddleStoreClient) Close(fd int) error {
 	//update metadata in zookeeper
 	//unlock
 	//salt the GUID and publish it
+	//need timeout to make sure at least one is published
 }
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original array
+	//try read cache first
+	//Blocks that are read from tapestry will be cached locally.
 }
 
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	//should return a copy of original array
+	//if offset is greater than size, pad with 0
+	//Writing to An Open File With write=false should return errors
+
+	//In copy-on-write, you replace the blocks that the user writes to.
+	//Tapestry has no delete function, so you have all the different versions of a block in Tapestry
+	//but only the most recent version will be included in the iNode.
 }
 
 func (p *puddleStoreClient) Mkdir(path string) error {
@@ -121,6 +137,7 @@ func (p *puddleStoreClient) Mkdir(path string) error {
 
 func (p *puddleStoreClient) Remove(path string) error {
 	//lock is not required for Remove
+	//if it is a dir, it should recursively remove its descendents
 }
 
 func (p *puddleStoreClient) List(path string) ([]string, error) {
@@ -128,5 +145,6 @@ func (p *puddleStoreClient) List(path string) ([]string, error) {
 }
 
 func (p *puddleStoreClient) Exit() {
-
+	p.Tap.zk.Close()
+	//cleanup (like all the opened fd) and all subsequent calls should return an error
 }
