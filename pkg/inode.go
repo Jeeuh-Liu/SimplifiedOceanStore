@@ -10,7 +10,3 @@ type inode struct {
 	Size     uint64
 	Blocks   map[int]tapestry.ID //block number to GUID?
 }
-
-//initially I bet the file should have at least one block
-func newInode() inode {
-}

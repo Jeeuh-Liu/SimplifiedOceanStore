@@ -25,13 +25,20 @@ func (c *Cluster) Shutdown() {
 // NewClient creates a new Puddlestore client
 func (c *Cluster) NewClient() (Client, error) {
 	// TODO: Return a new PuddleStore Client that implements the Client interface
-	return nil, nil
+	client := &puddleStoreClient{}
+	conn, err := ConnectZk(c.config.ZkAddr)
+	if err != nil {
+		return client, err
+	} else {
+		client.Conn = conn
+		return client, nil
+	}
 }
 
 // CreateCluster starts all nodes necessary for puddlestore
 func CreateCluster(config Config) (*Cluster, error) {
-	// TODO: Start your tapestry cluster with size config.NumTapestry. You should
-	// also use the zkAddr (zookeeper address) found in the config and pass it to the
+	// TODO: Start your tapestry cluster with size config.NumTapestry.
+	//create /tapestry directory
 	var c Cluster
 	for i := 0; i < config.NumTapestry; i++ {
 		connectTo := ""
@@ -47,7 +54,6 @@ func CreateCluster(config Config) (*Cluster, error) {
 		if err != nil {
 			return &c, err
 		}
-		//init client here pass Config.ZkAddr to the client Constructor
 		c.nodes = append(c.nodes, tap)
 		time.Sleep(10 * time.Millisecond)
 	}

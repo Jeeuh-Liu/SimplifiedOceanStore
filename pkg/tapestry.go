@@ -24,7 +24,7 @@ func NewTapestry(tap *tapestry.Node, zkAddr string) (*Tapestry, error) {
 	//Clients can then watch these znodes to determine which tapestry nodes are active or not.
 	//so you can use zk watches to track your membership changes
 	//each Tapestry node to make a file within /tapestry/, do not know whether the implementation is correct
-	path := "/tapestry/" + Tap.tap.ID()
+	path := "/tapestry/node-000" + Tap.tap.ID()
 	data := []byte(Tap.tap.Node.Address)
 	_, err = CreateEphSeq(zkConn, path, data)
 	if err != nil {
