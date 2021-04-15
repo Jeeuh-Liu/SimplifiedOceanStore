@@ -172,22 +172,28 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		//unlock
 		return []byte{}, fmt.Errorf("Get ChildrenW err")
 	}
-	//TODO:generate a random path from children
+	//TODO:generate a random path from children, replace child in line 176
 	child := children[0]
 	remote, err := p.getRandomRemote(child)
 	if err != nil {
 		//unlock
 		return []byte{}, fmt.Errorf("Unexpected err")
 	}
+	var rlt []byte
 	for ; start <= end; start++ {
-		//TODO: if cached, read locally
+		//if cached, read locally
+		if data, ok := p.cache[fd][int(start)]; ok {
+			rlt = append(rlt, data...)
+			continue
+		}
+		//watch event
 		select {
 		case event := <-eventChan:
 			if event.Type == zk.EventNodeCreated {
 				children = append(children, event.Path)
 			}
 			if event.Type == zk.EventNodeDeleted {
-				//TODO: remove event.Path
+				//TODO: remove event.Path from children
 				if event.Path == child {
 					//TODO: need a new membership server
 				}
@@ -195,7 +201,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		}
 		//TODO: otherwise, request the data, only one is sufficient?, how to get the data?
 	}
-	return nil, nil
+	return rlt, nil
 }
 
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
