@@ -143,7 +143,6 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 				Inode:    &node,
 				Modified: make(map[int]bool),
 			}
-			p.info[0].Inode.Blocks[0] = append(p.info[fd].Inode.Blocks[0], "aaaa")
 			return fd, nil
 		}
 	}
@@ -411,11 +410,19 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 
 func (p *puddleStoreClient) Mkdir(path string) error {
 	if underFile, err := p.underFile(path); underFile || err != nil {
-		return fmt.Errorf("create under file")
+		return fmt.Errorf("create under file %v", path)
+	}
+	node := inode{
+		IsDir:    true,
+		Filename: path,
+	}
+	data, err := encodeInode(node)
+	if err != nil {
+		return err
 	}
 	acl := zk.WorldACL(zk.PermAll)
 	//lock
-	_, err := p.Conn.Create(path, []byte{}, 0, acl)
+	_, err = p.Conn.Create(path, data, 0, acl)
 	//unlock
 	return err
 }
@@ -423,42 +430,33 @@ func (p *puddleStoreClient) Mkdir(path string) error {
 func (p *puddleStoreClient) Remove(path string) error {
 	//lock is not required for Remove
 	//if it is a dir, it should recursively remove its descendents
-	// exist, err := p.isFileExist(path)
-	// if err != nil {
-	// 	return err
-	// }
-	// if !exist {
-	// 	return fmt.Errorf("not exist")
-	// }
-	// //lock
-	// data, state, err := p.Conn.Get(path)
-	// if err != nil {
-	// 	//unlock
-	// 	return err
-	// }
-	// node, err := decodeInode(data)
-	// if err != nil {
-	// 	//unlock
-	// 	return err
-	// }
-	// //unlock
-	// if node.IsDir {
-	// 	//locked?
-	// 	children, _, err := p.Conn.Children(path)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	for _, s := range children {
-	// 		p.Remove(s)
-	// 	}
-	// 	p.Conn.Delete(path, state.Version) //version
-	// } else {
-	// 	//locked?
-	// 	//lock
-	// 	p.Conn.Delete(path, state.Version)
-	// 	//unlock
-	// }
-
+	exist, err := p.isFileExist(path)
+	if err != nil {
+		return err
+	}
+	if !exist {
+		return fmt.Errorf("not exist")
+	}
+	data, state, err := p.Conn.Get(path)
+	if err != nil {
+		return err
+	}
+	node, err := decodeInode(data)
+	if err != nil {
+		return err
+	}
+	if node.IsDir {
+		children, _, err := p.Conn.Children(path)
+		if err != nil {
+			return err
+		}
+		for _, s := range children {
+			p.Remove(s)
+		}
+		p.Conn.Delete(path, state.Version) //version
+	} else {
+		p.Conn.Delete(path, state.Version)
+	}
 	return nil
 }
 
