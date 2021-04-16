@@ -377,7 +377,6 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 		saltname := filename + fmt.Sprint(i)
 		err = remote.Store(saltname, data)
 		if err != nil {
-			x
 			continue
 		} else {
 			p.info[0].Inode.Blocks[0] = append(p.info[fd].Inode.Blocks[numBlock], saltname)
@@ -432,7 +431,7 @@ func (p *puddleStoreClient) Mkdir(path string) error {
 	}
 	acl := zk.WorldACL(zk.PermAll)
 	//lock
-	_, err := p.Conn.Create(path, data, 0, acl)
+	_, err = p.Conn.Create(path, data, 0, acl)
 	//unlock
 	return err
 }
