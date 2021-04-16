@@ -56,6 +56,28 @@ func (p *puddleStoreClient) getFd() int {
 	}
 	return -1
 }
+func (p *puddleStoreClient) lock() {
+	for {
+		_, err := CreateEphSeq(p.Conn, "/lockhhh", []byte{})
+		if err == nil {
+			return
+		}
+		exist, _, eventChan, err := p.Conn.ExistsW("/lockhhh")
+		if err != nil {
+			continue
+		}
+		if exist {
+			<-eventChan
+		}
+	}
+}
+
+func (p *puddleStoreClient) unlock() {
+	_, state, err := p.Conn.Get()
+	if err == nil {
+		p.Conn.Delete("/lockhhh", state.Version)
+	}
+}
 
 func (p *puddleStoreClient) isFileExist(path string) (bool, error) {
 	//lock
