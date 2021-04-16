@@ -188,40 +188,40 @@ func (p *puddleStoreClient) underFile(path string) (bool, error) {
 	}
 
 }
+
 func (p *puddleStoreClient) Close(fd int) error {
 	//if the map p.Info does not contains fd, return error
-	// info, ok := p.info[fd]
-	_, ok := p.info[fd]
+	info, ok := p.info[fd]
 	if !ok {
 		return fmt.Errorf("invalid fd")
 	}
 	//if flush is not needed unlock and return nil
-	// if !info.Flush {
-	// 	//unlock
-	// 	return nil
-	// }
+	if !info.Flush {
+		//unlock
+		return nil
+	}
 	// //update metadata in zookeeper, then unlcok
-	// if len(info.Modified) != 0 {
-	// 	path := info.Filename
-	// 	//it should be inode here
-	// 	data, err := encodeInode(*info.Inode)
-	// 	if err != nil {
-	// 		//unlock
-	// 		return fmt.Errorf("err in enode inode")
-	// 	}
-	// 	_, state, err := p.Conn.Exists(path)
-	// 	if err != nil {
-	// 		//unlcok
-	// 		return fmt.Errorf("unexpected err in zookeeper Exist")
-	// 	}
-	// 	_, err = p.Conn.Set(path, data, state.Version)
-	// 	if err != nil {
-	// 		//unlock
-	// 		return err
-	// 	}
-	// }
+	if len(info.Modified) != 0 {
+		path := info.Filename
+		//it should be inode here
+		data, err := encodeInode(*info.Inode)
+		if err != nil {
+			//unlock
+			return fmt.Errorf("err in enode inode")
+		}
+		_, state, err := p.Conn.Exists(path)
+		if err != nil {
+			//unlcok
+			return fmt.Errorf("unexpected err in zookeeper Exist")
+		}
+		_, err = p.Conn.Set(path, data, state.Version)
+		if err != nil {
+			//unlock
+			return err
+		}
+	}
 	// //clear fd
-	// delete(p.info, fd)
+	delete(p.info, fd)
 	return nil
 }
 
@@ -293,18 +293,18 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
 	// make sure at least one is published
 	// cache the write
+
 	// startBlock := offset / DefaultConfig().BlockSize
 	// endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
 	// currentBlock := info.Inode.Size / DefaultConfig().BlockSize
 	// if offset > info.Inode.Size {
+	// 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// 	p.readBlock(info.Filename, fd, int(currentBlock))
 	// 	for startBlock > currentBlock {
 	// 		currentBlock += 1
 	// 		p.publish(info.Filename, make([]byte, DefaultConfig().BlockSize))
 	// 	}
 	// 	p.publish(info.Filename, make([]byte, offset%DefaultConfig().BlockSize))
-	// 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
-
 	// }
 	// if startBlock == endBlock {
 	// 	tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
