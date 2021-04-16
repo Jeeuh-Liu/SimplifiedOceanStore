@@ -324,11 +324,11 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if offset > info.Inode.Size {
 		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 		if info.Inode.Size%DefaultConfig().BlockSize == 0 {
-			p.publish(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
+			p.savecache(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
 		}
 		for startBlock > currentBlock {
 			currentBlock += 1
-			p.publish(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
+			p.savecache(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
 		}
 	}
 	if startBlock == endBlock {
@@ -342,7 +342,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		r := tmp[:offset%DefaultConfig().BlockSize]
 		r = append(r, data...)
 		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
-		p.publish(fd, int(startBlock), r)
+		p.savecache(fd, int(startBlock), r)
 	} else {
 		tmp, err := p.readBlock(fd, int(startBlock))
 		if err != nil {
@@ -351,10 +351,10 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		r := tmp[:offset%DefaultConfig().BlockSize]
 		initbytes := DefaultConfig().BlockSize - offset%DefaultConfig().BlockSize
 		r = append(r, data[:initbytes]...)
-		p.publish(fd, int(startBlock), r)
+		p.savecache(fd, int(startBlock), r)
 		for i := startBlock + 1; i <= endBlock-1; i++ {
 			r = data[initbytes+(i-startBlock-1)*DefaultConfig().BlockSize : initbytes+(i-startBlock)*DefaultConfig().BlockSize]
-			p.publish(fd, int(i), r)
+			p.savecache(fd, int(i), r)
 		}
 		tmp, err = p.readBlock(fd, int(endBlock))
 		if err != nil {
@@ -362,11 +362,20 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		}
 		r = data[initbytes+(endBlock-startBlock-1)*DefaultConfig().BlockSize:]
 		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
-		p.publish(fd, int(endBlock), r)
+		p.savecache(fd, int(endBlock), r)
 	}
 	p.info[fd].Modified[0] = true
 	p.info[fd].Inode.Size = p.info[fd].Inode.Size + 1
 	return nil
+}
+
+func (p *puddleStoreClient) savecache(fd, numBlock int, data []byte) {
+	//lock()
+	if p.cache[fd] == nil {
+		p.cache[fd] = make(map[int][]byte)
+	}
+	p.cache[fd][numBlock] = data
+	//unlock()
 }
 
 func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
