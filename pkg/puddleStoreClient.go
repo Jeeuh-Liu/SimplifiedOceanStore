@@ -420,7 +420,7 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 
 func (p *puddleStoreClient) Mkdir(path string) error {
 	if underFile, err := p.underFile(path); underFile || err != nil {
-		return fmt.Errorf("create under file")
+		return fmt.Errorf("create under file %v", path)
 	}
 	acl := zk.WorldACL(zk.PermAll)
 	//lock
