@@ -274,6 +274,27 @@ func (p *puddleStoreClient) readBlock(filename string, fd, numBlock int) ([]byte
 	}
 }
 
+func (p *puddleStoreClient) publish(filename string, data []byte) error {
+	remotes, err := p.ConnectRemotes()
+	if err != nil {
+		return err
+	}
+	success := false
+	for i, remote := range remotes {
+		err = remote.Store(filename+string(i), data)
+		if err != nil {
+			continue
+		} else {
+			success = true
+		}
+	}
+	if !success {
+		return fmt.Errorf("none of publish success")
+	} else {
+		return nil
+	}
+}
+
 func (p *puddleStoreClient) Mkdir(path string) error {
 	acl := zk.WorldACL(zk.PermAll)
 	//lock
