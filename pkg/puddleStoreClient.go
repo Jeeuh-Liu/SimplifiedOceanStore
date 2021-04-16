@@ -3,6 +3,8 @@ package pkg
 import (
 	"fmt"
 	"math"
+	"math/rand"
+	"time"
 
 	tapestry "tapestry/pkg"
 
@@ -23,6 +25,7 @@ type puddleStoreClient struct {
 	cache     map[int]map[int][]byte //maintain a map from block num -> bytes or tapestry ID() TODO
 	fdCounter int
 	info      map[int]fileInfo //fd -> fileinfo
+	children  []string
 }
 
 func (p *puddleStoreClient) getFd() int {
@@ -138,15 +141,22 @@ func (p *puddleStoreClient) Close(fd int) error {
 	}
 	//update metadata in zookeeper, then unlcok
 	if len(info.Modified) != 0 {
-		for numBlock, guid := range info.Modified {
-			path := info.Filename + "-" + string(numBlock)
-			data := []byte(guid)
-			acl := zk.WorldACL(zk.PermAll)
-			_, err := p.Conn.Create(path, data, 0, acl)
-			if err != nil {
-				//unlock
-				return err
-			}
+		path := info.Filename
+		//it should be inode here
+		data, err := encodeInode(*info.Inode)
+		if err != nil {
+			//unlock
+			return fmt.Errorf("err in enode inode")
+		}
+		_, state, err := p.Conn.Exists(path)
+		if err != nil {
+			//unlcok
+			return fmt.Errorf("unexpected err in zookeeper Exist")
+		}
+		_, err = p.Conn.Set(path, data, state.Version)
+		if err != nil {
+			//unlock
+			return err
 		}
 	}
 	//clear fd
@@ -166,14 +176,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	if offset+size < info.Inode.Size {
 		end = (offset + size) / DefaultConfig().BlockSize
 	}
-	children, _, eventChan, err := p.Conn.ChildrenW("/tapestry")
-	if err != nil {
-		//unlock
-		return []byte{}, fmt.Errorf("Get ChildrenW err")
-	}
-	//TODO:generate a random path from children, replace child below
-	child := children[0]
-	remote, err := p.ConnectRemote(child)
+	remote, err := p.ConnectRemote()
 	if err != nil {
 		//unlock
 		return []byte{}, err
@@ -184,24 +187,6 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		if data, ok := p.cache[fd][int(start)]; ok {
 			rlt = append(rlt, data...)
 			continue
-		}
-		//watch event ???
-		select {
-		case event := <-eventChan:
-			if event.Type == zk.EventNodeCreated {
-				children = append(children, event.Path)
-			}
-			if event.Type == zk.EventNodeDeleted {
-				//TODO: remove event.Path from children
-				if event.Path == child {
-					//TODO: need a new membership server
-					remote, err = p.ConnectRemote(child)
-					if err != nil {
-						//unlock
-						return []byte{}, err
-					}
-				}
-			}
 		}
 		data, err := remote.Get(info.Filename)
 		if err != nil {
@@ -263,12 +248,63 @@ func (p *puddleStoreClient) Exit() {
 	//cleanup (like all the opened fd) and all subsequent calls should return an error
 }
 
-func (p *puddleStoreClient) ConnectRemote(path string) (*tapestry.Client, error) {
+func (p *puddleStoreClient) ConnectRemote() (*tapestry.Client, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
+	rand.Seed(time.Now().UnixNano())
+	path := p.children[rand.Intn(len(p.children))]
 	addr, _, err := p.Conn.Get(path)
 	if err != nil {
 		return nil, err
 	}
 	remote, err := tapestry.Connect(string(addr))
 	return remote, nil
+}
+
+func (p *puddleStoreClient) ConnectRemotes() ([]*tapestry.Client, error) {
+	//load balancing: It's better to have client gets a random node each time when need to interact.
+	//choose  random remote paths from p.children
+	var remotes []*tapestry.Client
+	p.shuffleChildren()
+	for i := 0; i < len(p.children) && len(remotes) < DefaultConfig().NumReplicas; i++ {
+		path := p.children[i]
+		addr, _, err := p.Conn.Get(path)
+		if err != nil {
+			return nil, err
+		}
+		remote, err := tapestry.Connect(string(addr))
+		if err == nil {
+			remotes = append(remotes, remote)
+		}
+	}
+	// if len(remotes) < DefaultConfig().NumReplicas
+	return remotes, nil
+}
+
+func (p *puddleStoreClient) watch() {
+	children, _, eventChan, _ := p.Conn.ChildrenW("/tapestry")
+	p.children = children
+	for {
+		event := <-eventChan
+		if event.Type == zk.EventNodeCreated {
+			p.children = append(p.children, event.Path)
+		}
+		if event.Type == zk.EventNodeDeleted {
+			len := len(p.children)
+			for i := range p.children {
+				if p.children[i] != event.Path {
+					continue
+				}
+				p.children[len-1], p.children[i] = p.children[i], p.children[len-1]
+				p.children = p.children[:len-1]
+			}
+		}
+	}
+}
+
+func (p *puddleStoreClient) shuffleChildren() {
+	rand.Seed(time.Now().UnixNano())
+	for i := len(p.children) - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)
+		p.children[i], p.children[j] = p.children[j], p.children[i]
+	}
 }
