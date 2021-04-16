@@ -417,6 +417,12 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 }
 
 func (p *puddleStoreClient) Mkdir(path string) error {
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+	if len(path) == 0 {
+		return fmt.Errorf("not allowed to create mkdir of root")
+	}
 	if underFile, err := p.underFile(path); underFile || err != nil {
 		return fmt.Errorf("create under file %v", path)
 	}
