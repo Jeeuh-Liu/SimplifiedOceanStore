@@ -311,23 +311,22 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
 	// make sure at least one is published
 	// cache the write
-	counter := 0
-	startBlock := offset / DefaultConfig().BlockSize
-	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
-	currentBlock := info.Inode.Size / DefaultConfig().BlockSize
-	if offset > info.Inode.Size {
-		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
-		reads, err := p.readBlock(fd, int(currentBlock))
-		if err != nil {
-			//unlock
-			return err
-		}
-		// 	for startBlock > currentBlock {
-		// 		currentBlock += 1
-		// 		p.publish(info.Filename, make([]byte, DefaultConfig().BlockSize))
-		// }
-		// 	p.publish(info.Filename, make([]byte, offset%DefaultConfig().BlockSize))
-	}
+	// startBlock := offset / DefaultConfig().BlockSize
+	// endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
+	// currentBlock := info.Inode.Size / DefaultConfig().BlockSize
+	// if offset > info.Inode.Size {
+	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
+	// reads, err := p.readBlock(fd, int(currentBlock))
+	// if err != nil {
+	// 	//unlock
+	// 	return err
+	// }
+	// 	for startBlock > currentBlock {
+	// 		currentBlock += 1
+	// 		p.publish(info.Filename, make([]byte, DefaultConfig().BlockSize))
+	// }
+	// 	p.publish(info.Filename, make([]byte, offset%DefaultConfig().BlockSize))
+	// }
 	// if startBlock == endBlock {
 	// 	tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
 	// 	if err != nil {
@@ -432,42 +431,33 @@ func (p *puddleStoreClient) Mkdir(path string) error {
 func (p *puddleStoreClient) Remove(path string) error {
 	//lock is not required for Remove
 	//if it is a dir, it should recursively remove its descendents
-	// exist, err := p.isFileExist(path)
-	// if err != nil {
-	// 	return err
-	// }
-	// if !exist {
-	// 	return fmt.Errorf("not exist")
-	// }
-	// //lock
-	// data, state, err := p.Conn.Get(path)
-	// if err != nil {
-	// 	//unlock
-	// 	return err
-	// }
-	// node, err := decodeInode(data)
-	// if err != nil {
-	// 	//unlock
-	// 	return err
-	// }
-	// //unlock
-	// if node.IsDir {
-	// 	//locked?
-	// 	children, _, err := p.Conn.Children(path)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	for _, s := range children {
-	// 		p.Remove(s)
-	// 	}
-	// 	p.Conn.Delete(path, state.Version) //version
-	// } else {
-	// 	//locked?
-	// 	//lock
-	// 	p.Conn.Delete(path, state.Version)
-	// 	//unlock
-	// }
-
+	exist, err := p.isFileExist(path)
+	if err != nil {
+		return err
+	}
+	if !exist {
+		return fmt.Errorf("not exist")
+	}
+	data, state, err := p.Conn.Get(path)
+	if err != nil {
+		return err
+	}
+	node, err := decodeInode(data)
+	if err != nil {
+		return err
+	}
+	if node.IsDir {
+		children, _, err := p.Conn.Children(path)
+		if err != nil {
+			return err
+		}
+		for _, s := range children {
+			p.Remove(s)
+		}
+		p.Conn.Delete(path, state.Version) //version
+	} else {
+		p.Conn.Delete(path, state.Version)
+	}
 	return nil
 }
 
