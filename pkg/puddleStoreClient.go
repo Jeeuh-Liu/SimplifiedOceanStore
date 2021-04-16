@@ -229,9 +229,9 @@ func (p *puddleStoreClient) Close(fd int) error {
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original data array
-	p.lock()
+	// p.lock()
 	info, ok := p.info[fd]
-	p.unlock()
+	// p.unlock()
 	if !ok {
 		return []byte{}, fmt.Errorf("invalid fd")
 	}
@@ -388,9 +388,9 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 	// p.lock()
 	// zkConn := p.Conn
 	// p.unlock()
-	p.lock()
+	// p.lock()
 	data, ok := p.cache[fd][numBlock]
-	p.unlock()
+	// p.unlock()
 	if ok {
 		return data, nil
 	} else {
