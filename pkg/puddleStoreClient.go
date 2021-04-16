@@ -142,24 +142,24 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 		}
 	}
 	// //lock
-	// data, _, err := p.Conn.Get(path)
-	// if err != nil {
-	// 	//unlock
-	// 	return fd, err
-	// }
-	// node, err := decodeInode(data)
-	// if err != nil {
-	// 	//unlock
-	// 	return fd, err
-	// }
-	// if node.IsDir {
-	// 	return fd, fmt.Errorf("it's a directory")
-	// }
-	// fd = p.getFd()
-	// p.info[fd] = fileInfo{
-	// 	Flush: write,
-	// 	Inode: node,
-	// }
+	data, _, err := p.Conn.Get(path)
+	if err != nil {
+		//unlock
+		return fd, err
+	}
+	node, err := decodeInode(data)
+	if err != nil {
+		//unlock
+		return fd, err
+	}
+	if node.IsDir {
+		return fd, fmt.Errorf("it's a directory")
+	}
+	fd = p.getFd()
+	p.info[fd] = fileInfo{
+		Flush: write,
+		Inode: node,
+	}
 	return fd, nil
 }
 
@@ -374,6 +374,9 @@ func (p *puddleStoreClient) publish(filename string, data []byte) error {
 }
 
 func (p *puddleStoreClient) Mkdir(path string) error {
+	if underFile, err := p.underFile(path); underFile || err != nil {
+		return fmt.Errorf("create under file")
+	}
 	acl := zk.WorldACL(zk.PermAll)
 	//lock
 	_, err := p.Conn.Create(path, []byte{}, 0, acl)
