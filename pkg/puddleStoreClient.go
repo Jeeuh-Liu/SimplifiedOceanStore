@@ -299,10 +299,10 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if len(data) == 0 {
 		return nil
 	}
-	err := p.publish(fd, 0, data)
-	if err != nil {
-		return fmt.Errorf("problem in publish %v", err)
-	}
+	// err := p.publish(fd, 0, data)
+	// if err != nil {
+	// 	return fmt.Errorf("problem in publish %v", err)
+	// }
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
