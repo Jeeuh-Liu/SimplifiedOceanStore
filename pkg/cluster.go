@@ -28,16 +28,16 @@ func (c *Cluster) Shutdown() {
 func (c *Cluster) NewClient() (Client, error) {
 	// TODO: Return a new PuddleStore Client that implements the Client interface
 	client := &puddleStoreClient{}
+	client.lock()
 	conn, err := ConnectZk(c.config.ZkAddr)
-	if err != nil {
-		return client, err
-	} else {
+	if err == nil {
 		client.Conn = conn
 		client.init()
 		client.connectAll()
 		go client.watch()
-		return client, nil
 	}
+	client.unlock()
+	return client, err
 }
 
 // CreateCluster starts all nodes necessary for puddlestore
