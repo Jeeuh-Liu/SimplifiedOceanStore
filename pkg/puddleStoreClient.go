@@ -278,15 +278,19 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		}
 		if i == startBlock {
 			data = data[offset:]
+			bytesRead = bytesRead + uint64(len(data)) - offset
 		} else {
 			if i == endBlock {
 				left := size - bytesRead
 				if left < DefaultConfig().BlockSize {
 					data = data[:left]
 				}
+			} else {
+				bytesRead = bytesRead + uint64(len(data))
 			}
+
 		}
-		bytesRead = bytesRead + uint64(len(data))
+
 		rlt = append(rlt, data...)
 	}
 	return rlt, nil
