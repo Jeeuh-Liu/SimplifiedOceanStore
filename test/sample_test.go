@@ -80,5 +80,21 @@ func TestTwoClient(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v, %v", client, err)
 	}
+}
 
+func TestCreateUnderRoot(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Errorf("%v, %v", client, err)
+	}
+	fd, err := client.Open("/a.txt", true, false)
+	if err != nil || fd < 0 {
+		t.Errorf("%v, %v", fd, err)
+	}
 }

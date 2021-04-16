@@ -4,8 +4,6 @@ import (
 	"fmt"
 	tapestry "tapestry/pkg"
 	"time"
-
-	"github.com/samuel/go-zookeeper/zk"
 )
 
 // Cluster is an interface for all nodes in a puddlestore cluster. One should be able to shutdown
@@ -48,9 +46,7 @@ func CreateCluster(config Config) (*Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := "/tapestry"
-	data := []byte("tapestry directory")
-	_, err = zkConn.Create(path, data, 0, zk.WorldACL(zk.PermAll))
+	_, err = CreateEphSeq(zkConn, "/tapestry", []byte("tapestry directory"))
 	if err != nil {
 		return nil, err
 	}
