@@ -171,28 +171,43 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		return []byte{}, fmt.Errorf("invalid fd")
 	}
 	//calculate the blocks we need to read
-	start := offset / DefaultConfig().BlockSize
-	end := info.Inode.Size / DefaultConfig().BlockSize
+	startBlock := offset / DefaultConfig().BlockSize
+	endBlock := info.Inode.Size / DefaultConfig().BlockSize
 	if offset+size < info.Inode.Size {
-		end = (offset + size) / DefaultConfig().BlockSize
+		endBlock = (offset + size) / DefaultConfig().BlockSize
 	}
-	remote, err := p.ConnectRemote()
-	if err != nil {
-		//unlock
-		return []byte{}, err
-	}
+	offset = offset % DefaultConfig().BlockSize
 	var rlt []byte
-	for ; start <= end; start++ {
+	var bytesRead uint64
+	bytesRead = 0
+	for i := startBlock; i <= endBlock; i++ {
 		//if cached, read locally
-		if data, ok := p.cache[fd][int(start)]; ok {
+		var data []byte
+		if data, ok := p.cache[fd][int(startBlock)]; ok {
 			rlt = append(rlt, data...)
-			continue
+		} else {
+			remote, err := p.ConnectRemote()
+			if err != nil {
+				//unlock
+				return []byte{}, err
+			}
+			data, err = remote.Get(info.Filename)
+			if err != nil {
+				//unlock
+				return []byte{}, err
+			}
 		}
-		data, err := remote.Get(info.Filename)
-		if err != nil {
-			//unlock
-			return []byte{}, err
+		if i == startBlock {
+			data = data[offset:]
+		} else {
+			if i == endBlock {
+				left := size - bytesRead
+				if left < DefaultConfig().BlockSize {
+					data = data[:left]
+				}
+			}
 		}
+		bytesRead = bytesRead + uint64(len(data))
 		rlt = append(rlt, data...)
 	}
 	return rlt, nil
@@ -232,7 +247,6 @@ func (p *puddleStoreClient) Mkdir(path string) error {
 func (p *puddleStoreClient) Remove(path string) error {
 	//lock is not required for Remove
 	//if it is a dir, it should recursively remove its descendents
-	//TODO
 	exist, err := p.isFileExist(path)
 	if err != nil {
 		return err
@@ -273,7 +287,6 @@ func (p *puddleStoreClient) Remove(path string) error {
 }
 
 func (p *puddleStoreClient) List(path string) ([]string, error) {
-	//TODO
 	exist, err := p.isFileExist(path)
 	if err != nil {
 		return nil, err
