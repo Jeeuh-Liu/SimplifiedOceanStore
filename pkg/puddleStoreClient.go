@@ -376,6 +376,9 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 	if count == 0 {
 		return fmt.Errorf("none of publish success")
 	} else {
+		if p.cache[fd] == nil {
+			p.cache[fd] = make(map[int][]byte)
+		}
 		p.cache[fd][numBlock] = data
 		return nil
 	}
