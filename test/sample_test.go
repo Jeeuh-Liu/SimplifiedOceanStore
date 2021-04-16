@@ -59,8 +59,26 @@ func TestClient(t *testing.T) {
 	}
 	defer cluster.Shutdown()
 
-	_, err = cluster.NewClient()
+	client, err := cluster.NewClient()
 	if err != nil {
-		t.Errorf("%v", err)
+		t.Errorf("%v, %v", client, err)
 	}
+}
+
+func TestTwoClient(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Errorf("%v, %v", client, err)
+	}
+	client, err = cluster.NewClient()
+	if err != nil {
+		t.Errorf("%v, %v", client, err)
+	}
+
 }

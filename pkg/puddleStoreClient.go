@@ -34,7 +34,7 @@ func (p *puddleStoreClient) init() {
 	p.cache = make(map[int]map[int][]byte)
 	p.fdCounter = 0
 	p.info = make(map[int]fileInfo)
-	p.children = make([]string, DefaultConfig().NumTapestry*5)
+	p.children = make([]string, DefaultConfig().NumTapestry)
 }
 
 func (p *puddleStoreClient) getFd() int {
@@ -268,53 +268,53 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
 	// make sure at least one is published
 	// cache the write
-	startBlock := offset / DefaultConfig().BlockSize
-	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
-	currentBlock := info.Inode.Size / DefaultConfig().BlockSize
-	if offset > info.Inode.Size {
-		p.readBlock(info.Filename, fd, int(currentBlock))
-		for startBlock > currentBlock {
-			currentBlock += 1
-			p.publish(info.Filename, make([]byte, DefaultConfig().BlockSize))
-		}
-		p.publish(info.Filename, make([]byte, offset%DefaultConfig().BlockSize))
-		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
+	// startBlock := offset / DefaultConfig().BlockSize
+	// endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
+	// currentBlock := info.Inode.Size / DefaultConfig().BlockSize
+	// if offset > info.Inode.Size {
+	// 	p.readBlock(info.Filename, fd, int(currentBlock))
+	// 	for startBlock > currentBlock {
+	// 		currentBlock += 1
+	// 		p.publish(info.Filename, make([]byte, DefaultConfig().BlockSize))
+	// 	}
+	// 	p.publish(info.Filename, make([]byte, offset%DefaultConfig().BlockSize))
+	// 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 
-	}
-	if startBlock == endBlock {
-		tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
-		if err != nil {
-			return err
-		}
-		r := tmp[:offset%DefaultConfig().BlockSize]
-		r = append(r, data...)
-		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
-		p.publish(info.Filename, r)
-		p.cache[fd][int(startBlock)] = r
-	} else {
-		tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
-		if err != nil {
-			return err
-		}
-		r := tmp[:offset%DefaultConfig().BlockSize]
-		initbytes := DefaultConfig().BlockSize - offset%DefaultConfig().BlockSize
-		r = append(r, data[:initbytes]...)
-		p.publish(info.Filename, r)
-		p.cache[fd][int(startBlock)] = r
-		for i := startBlock + 1; i <= endBlock-1; i++ {
-			r = data[initbytes+(i-startBlock-1)*DefaultConfig().BlockSize : initbytes+(i-startBlock)*DefaultConfig().BlockSize]
-			p.publish(info.Filename, r)
-			p.cache[fd][int(i)] = r
-		}
-		tmp, err = p.readBlock(info.Filename, fd, int(endBlock))
-		if err != nil {
-			return err
-		}
-		r = data[initbytes+(endBlock-startBlock-1)*DefaultConfig().BlockSize:]
-		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
-		p.publish(info.Filename, r)
-		p.cache[fd][int(endBlock)] = r
-	}
+	// }
+	// if startBlock == endBlock {
+	// 	tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	r := tmp[:offset%DefaultConfig().BlockSize]
+	// 	r = append(r, data...)
+	// 	r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
+	// 	p.publish(info.Filename, r)
+	// 	p.cache[fd][int(startBlock)] = r
+	// } else {
+	// 	tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	r := tmp[:offset%DefaultConfig().BlockSize]
+	// 	initbytes := DefaultConfig().BlockSize - offset%DefaultConfig().BlockSize
+	// 	r = append(r, data[:initbytes]...)
+	// 	p.publish(info.Filename, r)
+	// 	p.cache[fd][int(startBlock)] = r
+	// 	for i := startBlock + 1; i <= endBlock-1; i++ {
+	// 		r = data[initbytes+(i-startBlock-1)*DefaultConfig().BlockSize : initbytes+(i-startBlock)*DefaultConfig().BlockSize]
+	// 		p.publish(info.Filename, r)
+	// 		p.cache[fd][int(i)] = r
+	// 	}
+	// 	tmp, err = p.readBlock(info.Filename, fd, int(endBlock))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	r = data[initbytes+(endBlock-startBlock-1)*DefaultConfig().BlockSize:]
+	// 	r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
+	// 	p.publish(info.Filename, r)
+	// 	p.cache[fd][int(endBlock)] = r
+	// }
 	return nil
 }
 
