@@ -178,6 +178,27 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		//unlock
 		return []byte{}, err
 	}
+	go func() {
+		for {
+			select {
+			case event := <-eventChan:
+				if event.Type == zk.EventNodeCreated {
+					children = append(children, event.Path)
+				}
+				if event.Type == zk.EventNodeDeleted {
+					//TODO: remove event.Path from children
+					if event.Path == child {
+						//TODO: need a new membership server
+						remote, err = p.ConnectRemote(child)
+						if err != nil {
+							//unlock
+							continue
+						}
+					}
+				}
+			}
+		}
+	}()
 	var rlt []byte
 	for ; start <= end; start++ {
 		//if cached, read locally
@@ -186,23 +207,6 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 			continue
 		}
 		//watch event ???
-		select {
-		case event := <-eventChan:
-			if event.Type == zk.EventNodeCreated {
-				children = append(children, event.Path)
-			}
-			if event.Type == zk.EventNodeDeleted {
-				//TODO: remove event.Path from children
-				if event.Path == child {
-					//TODO: need a new membership server
-					remote, err = p.ConnectRemote(child)
-					if err != nil {
-						//unlock
-						return []byte{}, err
-					}
-				}
-			}
-		}
 		data, err := remote.Get(info.Filename)
 		if err != nil {
 			//unlock
@@ -224,6 +228,9 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if !info.Flush {
 		//should we unlock?
 		return fmt.Errorf("write == false")
+	}
+	if offset > info.Inode.Size {
+		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	}
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
