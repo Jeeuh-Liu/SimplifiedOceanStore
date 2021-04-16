@@ -2,10 +2,9 @@ package pkg
 
 import (
 	"fmt"
+	"github.com/samuel/go-zookeeper/zk"
 	tapestry "tapestry/pkg"
 	"time"
-
-	"github.com/samuel/go-zookeeper/zk"
 )
 
 // Cluster is an interface for all nodes in a puddlestore cluster. One should be able to shutdown
@@ -46,13 +45,13 @@ func CreateCluster(config Config) (*Cluster, error) {
 	//create tapestry directory file
 	zkConn, err := ConnectZk(config.ZkAddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("problem in connect zk, %v", err)
 	}
 	path := "/tapestry"
 	data := []byte("tapestry directory")
 	_, err = zkConn.Create(path, data, 0, zk.WorldACL(zk.PermAll))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("problem in create tapestry dir, %v", err)
 	}
 	// TODO: Start your tapestry cluster with size config.NumTapestry.
 	var c Cluster
@@ -65,11 +64,11 @@ func CreateCluster(config Config) (*Cluster, error) {
 		id := tapestry.MakeID(tapestry.RandomID().String())
 		t, err := tapestry.Start(id, 0, connectTo)
 		if err != nil {
-			return &c, err
+			return &c, fmt.Errorf("fail to start tapestry, %v", err)
 		}
 		tap, err := NewTapestry(t, config.ZkAddr)
 		if err != nil {
-			return &c, err
+			return &c, fmt.Errorf("fail to new tapestry, %v", err)
 		}
 		c.nodes = append(c.nodes, tap)
 		time.Sleep(10 * time.Millisecond)
