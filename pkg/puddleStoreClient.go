@@ -301,10 +301,10 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if len(data) == 0 {
 		return nil
 	}
-	err := p.publish(fd, 0, data)
-	if err != nil {
-		return fmt.Errorf("problem in publish %v", err)
-	}
+	// err := p.publish(fd, 0, data)
+	// if err != nil {
+	// 	return fmt.Errorf("problem in publish %v", err)
+	// }
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
@@ -376,6 +376,9 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 	if count == 0 {
 		return fmt.Errorf("none of publish success")
 	} else {
+		if p.cache[fd] == nil {
+			p.cache[fd] = make(map[int][]byte)
+		}
 		p.cache[fd][numBlock] = data
 		return nil
 	}
@@ -415,6 +418,12 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 }
 
 func (p *puddleStoreClient) Mkdir(path string) error {
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+	if len(path) == 0 {
+		return fmt.Errorf("not allowed to create mkdir of root")
+	}
 	if underFile, err := p.underFile(path); underFile || err != nil {
 		return fmt.Errorf("create under file %v", path)
 	}
