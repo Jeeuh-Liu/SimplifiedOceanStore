@@ -306,26 +306,28 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("problem in publish %v", err)
 	}
-	p.info[fd].Modified[0] = true
-	p.info[fd].Inode.Size = p.info[fd].Inode.Size + 1
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
 	// make sure at least one is published
 	// cache the write
-
-	// startBlock := offset / DefaultConfig().BlockSize
-	// endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
-	// currentBlock := info.Inode.Size / DefaultConfig().BlockSize
-	// if offset > info.Inode.Size {
-	// 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
-	// 	p.readBlock(info.Filename, fd, int(currentBlock))
-	// 	for startBlock > currentBlock {
-	// 		currentBlock += 1
-	// 		p.publish(info.Filename, make([]byte, DefaultConfig().BlockSize))
-	// 	}
-	// 	p.publish(info.Filename, make([]byte, offset%DefaultConfig().BlockSize))
-	// }
+	counter := 0
+	startBlock := offset / DefaultConfig().BlockSize
+	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
+	currentBlock := info.Inode.Size / DefaultConfig().BlockSize
+	if offset > info.Inode.Size {
+		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
+		reads, err := p.readBlock(fd, int(currentBlock))
+		if err != nil {
+			//unlock
+			return err
+		}
+		// 	for startBlock > currentBlock {
+		// 		currentBlock += 1
+		// 		p.publish(info.Filename, make([]byte, DefaultConfig().BlockSize))
+		// }
+		// 	p.publish(info.Filename, make([]byte, offset%DefaultConfig().BlockSize))
+	}
 	// if startBlock == endBlock {
 	// 	tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
 	// 	if err != nil {
@@ -360,6 +362,8 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// 	p.publish(info.Filename, r)
 	// 	p.cache[fd][int(endBlock)] = r
 	// }
+	p.info[fd].Modified[0] = true
+	p.info[fd].Inode.Size = p.info[fd].Inode.Size + 1
 	return err
 }
 
