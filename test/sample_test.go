@@ -26,6 +26,29 @@ func readFile(client puddlestore.Client, path string, offset, size uint64) ([]by
 	return client.Read(fd, offset, size)
 }
 
+func TestReadEmptyFile(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := "/a"
+
+	fd, err := client.Open(path, true, true)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	data, err := client.Read(fd, 0, 5)
+	if len(data) != 0 || err != nil {
+		t.Errorf("should return empty array and nil")
+	}
+}
 func TestReadWrite(t *testing.T) {
 	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
 	if err != nil {
@@ -53,7 +76,7 @@ func TestReadWrite(t *testing.T) {
 	}
 
 	if in != string(out) {
-		t.Fatalf("Expected: %v, Got: %v", in, string(out))
+		t.Fatalf("Expected: %v %v, Got: %v %v", in, len(in), string(out), len(out))
 	}
 }
 

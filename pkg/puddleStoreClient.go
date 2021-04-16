@@ -252,18 +252,23 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	}
 	// data, err := p.readBlock(fd, 0)
 	//calculate the blocks we need to read
-	startBlock := offset / DefaultConfig().BlockSize
-	endBlock := info.Inode.Size / DefaultConfig().BlockSize
-	if offset+size < info.Inode.Size {
-		endBlock = (offset + size) / DefaultConfig().BlockSize
+	boundary := info.Inode.Size
+	if offset+size < boundary {
+		boundary = offset + size
+	} else {
+		size = boundary - offset
 	}
-
+	startBlock := offset / DefaultConfig().BlockSize
+	endBlock := boundary / DefaultConfig().BlockSize
 	offset = offset % DefaultConfig().BlockSize
 	var rlt []byte
 	if startBlock == endBlock {
 		data, err := p.readBlock(fd, int(startBlock))
 		if err != nil {
 			return []byte{}, err
+		}
+		if len(data) == 0 {
+			return []byte{}, fmt.Errorf("unexpected error")
 		}
 		return data[offset:(offset + size)], nil
 	}
