@@ -144,15 +144,17 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 				return fd, err
 			}
 			fd = p.getFd()
+			// p.ClientMtx.Lock()
 			p.info[fd] = fileInfo{
 				Flush:    write,
 				Inode:    &node,
 				Modified: make(map[int]bool),
 			}
+			// p.ClientMtx.Unlock()
 			return fd, nil
 		}
 	}
-	// //lock
+	//lock
 	data, _, err := p.Conn.Get(path)
 	if err != nil {
 		//unlock
@@ -166,11 +168,13 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 	if node.IsDir {
 		return fd, fmt.Errorf("it's a directory")
 	}
+	// p.ClientMtx.Lock()
 	fd = p.getFd()
 	p.info[fd] = fileInfo{
 		Flush: write,
 		Inode: node,
 	}
+	// p.ClientMtx.Unlock()
 	return fd, nil
 }
 
@@ -200,14 +204,18 @@ func (p *puddleStoreClient) underFile(path string) (bool, error) {
 
 func (p *puddleStoreClient) Close(fd int) error {
 	//if the map p.Info does not contains fd, return error
+	// p.ClientMtx.Lock()
 	info, ok := p.info[fd]
+	// p.ClientMtx.Unlock()
 	if !ok {
 		return fmt.Errorf("invalid fd")
 	}
 	//if flush is not needed unlock and return nil
 	if !info.Flush {
 		//unlock
+		// p.ClientMtx.Lock()
 		delete(p.info, fd)
+		// p.ClientMtx.Unlock()
 		return nil
 	}
 	// //update metadata in zookeeper, then unlcok
@@ -231,15 +239,17 @@ func (p *puddleStoreClient) Close(fd int) error {
 		}
 	}
 	// //clear fd
+	// p.ClientMtx.Lock()
 	delete(p.info, fd)
+	// p.ClientMtx.Unlock()
 	return nil
 }
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original data array
-	// p.lock()
+	// p.ClientMtx.Lock()
 	info, ok := p.info[fd]
-	// p.unlock()
+	// p.ClientMtx.Unlock()
 	if !ok {
 		return []byte{}, fmt.Errorf("invalid fd")
 	}
@@ -263,6 +273,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	offset = offset % DefaultConfig().BlockSize
 	var rlt []byte
 	if startBlock == endBlock {
+		//first read from cache
 		data, err := p.readBlock(fd, int(startBlock))
 		if err != nil {
 			return []byte{}, err
@@ -270,6 +281,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		if len(data) == 0 {
 			return []byte{}, fmt.Errorf("unexpected error")
 		}
+		//cache it
 		return data[offset:(offset + size)], nil
 	}
 	var bytesRead uint64
@@ -293,7 +305,6 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 			} else {
 				bytesRead = bytesRead + uint64(len(data))
 			}
-
 		}
 
 		rlt = append(rlt, data...)
@@ -305,7 +316,9 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	//should return a copy of original data array and the client should be able to read its own write
 	//if anything fail, should we clear fd?
+	// p.ClientMtx.Lock()
 	info, ok := p.info[fd]
+	// p.ClientMtx.Unlock()
 	if !ok {
 		return fmt.Errorf("invalid fd")
 	}
@@ -379,12 +392,12 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 }
 
 func (p *puddleStoreClient) savecache(fd, numBlock int, data []byte) {
-	//lock()
+	// p.ClientMtx.Lock()
 	if p.cache[fd] == nil {
 		p.cache[fd] = make(map[int][]byte)
 	}
 	p.cache[fd][numBlock] = data
-	//unlock()
+	// p.ClientMtx.Unock()
 }
 
 func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
@@ -393,6 +406,7 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 		return fmt.Errorf("connectRemotes, %v", err)
 	}
 	count := 0
+	// p.ClientMtx.Lock()
 	for i, remote := range remotes {
 		filename := p.info[fd].Inode.Filename
 		saltname := filename + fmt.Sprint(i)
@@ -403,12 +417,14 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 		}
 	}
 	if count == 0 {
+		// p.ClientMtx.Unlock()
 		return fmt.Errorf("none of publish success")
 	} else {
 		if p.cache[fd] == nil {
 			p.cache[fd] = make(map[int][]byte)
 		}
 		p.cache[fd][numBlock] = data
+		// p.ClientMtx.Unlock()
 		return nil
 	}
 }
@@ -417,9 +433,9 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 	// p.lock()
 	// zkConn := p.Conn
 	// p.unlock()
-	// p.lock()
+	// p.ClientMtx.Lock()
 	data, ok := p.cache[fd][numBlock]
-	// p.unlock()
+	// p.ClientMtx.Unlock()
 	if ok {
 		return data, nil
 	} else {
