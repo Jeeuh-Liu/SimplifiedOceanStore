@@ -202,53 +202,48 @@ func (p *puddleStoreClient) Close(fd int) error {
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original data array
-	// info, ok := p.info[fd]
-	_, ok := p.info[fd]
+	info, ok := p.info[fd]
 	if !ok {
 		return []byte{}, fmt.Errorf("invalid fd")
 	}
 	//calculate the blocks we need to read
-	// startBlock := offset / DefaultConfig().BlockSize
-	// endBlock := info.Inode.Size / DefaultConfig().BlockSize
-	// if offset+size < info.Inode.Size {
-	// 	endBlock = (offset + size) / DefaultConfig().BlockSize
-	// }
+	startBlock := offset / DefaultConfig().BlockSize
+	endBlock := info.Inode.Size / DefaultConfig().BlockSize
+	if offset+size < info.Inode.Size {
+		endBlock = (offset + size) / DefaultConfig().BlockSize
+	}
 	// offset = offset % DefaultConfig().BlockSize
-	// var rlt []byte
-	// var bytesRead uint64
-	// bytesRead = 0
-	// for i := startBlock; i <= endBlock; i++ {
-	// 	//if cached, read locally
-	// 	var data []byte
-	// 	if data, ok := p.cache[fd][int(startBlock)]; ok {
-	// 		rlt = append(rlt, data...)
-	// 	} else {
-	// 		remote, err := p.connectRemote()
-	// 		if err != nil {
-	// 			//unlock
-	// 			return []byte{}, err
-	// 		}
-	// 		data, err = remote.Get(info.Filename)
-	// 		if err != nil {
-	// 			//unlock
-	// 			return []byte{}, err
-	// 		}
-	// 	}
-	// 	if i == startBlock {
-	// 		data = data[offset:]
-	// 	} else {
-	// 		if i == endBlock {
-	// 			left := size - bytesRead
-	// 			if left < DefaultConfig().BlockSize {
-	// 				data = data[:left]
-	// 			}
-	// 		}
-	// 	}
-	// 	bytesRead = bytesRead + uint64(len(data))
-	// 	rlt = append(rlt, data...)
-	// }
-	// return rlt, nil
-	return nil, nil
+	var rlt []byte
+	var bytesRead uint64
+	bytesRead = 0
+	if startBlock == endBlock {
+		data, err := p.readBlock(info.Filename, fd, int(startBlock))
+		if err != nil {
+			return []byte{}, err
+		}
+		rlt = data[offset%DefaultConfig().BlockSize : (offset+size)%DefaultConfig().BlockSize]
+	} else {
+		for i := startBlock; i <= endBlock; i++ {
+			//if cached, read locally
+			data, err := p.readBlock(info.Filename, fd, int(startBlock))
+			if err != nil {
+				return []byte{}, err
+			}
+			if i == startBlock {
+				data = data[offset%DefaultConfig().BlockSize:]
+			} else {
+				if i == endBlock {
+					left := size - bytesRead
+					if left < DefaultConfig().BlockSize {
+						data = data[:left]
+					}
+				}
+			}
+			bytesRead = bytesRead + uint64(len(data))
+			rlt = append(rlt, data...)
+		}
+	}
+	return rlt, nil
 }
 
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
