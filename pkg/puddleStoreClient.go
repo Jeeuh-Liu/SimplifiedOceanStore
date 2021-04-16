@@ -73,7 +73,7 @@ func (p *puddleStoreClient) lock() {
 }
 
 func (p *puddleStoreClient) unlock() {
-	_, state, err := p.Conn.Get()
+	_, state, err := p.Conn.Get("/lockhhh")
 	if err == nil {
 		p.Conn.Delete("/lockhhh", state.Version)
 	}
@@ -256,6 +256,22 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// make sure at least one is published
 	// cache the write
 	return nil
+}
+
+func (p *puddleStoreClient) readBlock(filename string, fd, numBlock int) ([]byte, error) {
+	if data, ok := p.cache[fd][numBlock]; ok {
+		return data, nil
+	} else {
+		remote, err := p.ConnectRemote()
+		if err != nil {
+			return []byte{}, err
+		}
+		data, err = remote.Get(filename)
+		if err != nil {
+			return []byte{}, err
+		}
+		return data, nil
+	}
 }
 
 func (p *puddleStoreClient) Mkdir(path string) error {
