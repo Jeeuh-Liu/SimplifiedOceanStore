@@ -112,6 +112,9 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 		if !create {
 			return fd, fmt.Errorf("create == false && exist == false, err")
 		} else {
+			if underFile, err := p.underFile(path); underFile || err != nil {
+				return fd, fmt.Errorf("create under file")
+			}
 			node := inode{
 				IsDir:    false,
 				Filename: path,
@@ -161,7 +164,23 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 }
 
 //You should retry a few times, between 3 to 10 times if anything fail
+func (p *puddleStoreClient) underFile(path string) (bool, error) {
+	dir := filepath.Dir(path)
+	data, _, err := p.Conn.Get(dir)
+	if err != nil {
+		return false, err
+	}
+	node, err := decodeInode(data)
+	if err != nil {
+		return false, err
+	}
+	if node.IsDir {
+		return false, nil
+	} else {
+		return true, nil
+	}
 
+}
 func (p *puddleStoreClient) Close(fd int) error {
 	//if the map p.Info does not contains fd, return error
 	// info, ok := p.info[fd]
