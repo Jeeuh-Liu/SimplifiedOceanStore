@@ -238,52 +238,50 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	if info.Inode.Size == 0 {
 		return []byte{}, nil
 	}
-	// if offset > info.Inode.Size {
-	// 	return []byte{}, nil
-	// }
-	data, err := p.readBlock(fd, 0)
+	if offset > info.Inode.Size {
+		return []byte{}, nil
+	}
+	// data, err := p.readBlock(fd, 0)
 	//calculate the blocks we need to read
-	// startBlock := offset / DefaultConfig().BlockSize
-	// endBlock := info.Inode.Size / DefaultConfig().BlockSize
-	// if offset+size < info.Inode.Size {
-	// 	endBlock = (offset + size) / DefaultConfig().BlockSize
-	// }
-	// offset = offset % DefaultConfig().BlockSize
-	// var rlt []byte
-	// var bytesRead uint64
-	// bytesRead = 0
-	// for i := startBlock; i <= endBlock; i++ {
-	// 	//if cached, read locally
-	// 	var data []byte
-	// 	if data, ok := p.cache[fd][int(startBlock)]; ok {
-	// 		rlt = append(rlt, data...)
-	// 	} else {
-	// 		remote, err := p.connectRemote()
-	// 		if err != nil {
-	// 			//unlock
-	// 			return []byte{}, err
-	// 		}
-	// 		data, err = remote.Get(info.Filename)
-	// 		if err != nil {
-	// 			//unlock
-	// 			return []byte{}, err
-	// 		}
-	// 	}
-	// 	if i == startBlock {
-	// 		data = data[offset:]
-	// 	} else {
-	// 		if i == endBlock {
-	// 			left := size - bytesRead
-	// 			if left < DefaultConfig().BlockSize {
-	// 				data = data[:left]
-	// 			}
-	// 		}
-	// 	}
-	// 	bytesRead = bytesRead + uint64(len(data))
-	// 	rlt = append(rlt, data...)
-	// }
-	// return rlt, nil
-	return data, err
+	startBlock := offset / DefaultConfig().BlockSize
+	endBlock := info.Inode.Size / DefaultConfig().BlockSize
+	if offset+size < info.Inode.Size {
+		endBlock = (offset + size) / DefaultConfig().BlockSize
+	}
+
+	offset = offset % DefaultConfig().BlockSize
+	var rlt []byte
+	if startBlock == endBlock {
+		data, err := p.readBlock(fd, int(startBlock))
+		if err != nil {
+			return []byte{}, err
+		}
+		return data[offset:(offset + size)], nil
+	}
+	var bytesRead uint64
+	bytesRead = 0
+	for i := startBlock; i <= endBlock; i++ {
+		//if cached, read locally
+		var data []byte
+		data, err := p.readBlock(fd, int(i))
+		if err != nil {
+			return []byte{}, err
+		}
+		if i == startBlock {
+			data = data[offset:]
+		} else {
+			if i == endBlock {
+				left := size - bytesRead
+				if left < DefaultConfig().BlockSize {
+					data = data[:left]
+				}
+			}
+		}
+		bytesRead = bytesRead + uint64(len(data))
+		rlt = append(rlt, data...)
+	}
+	return rlt, nil
+	// return data, err
 }
 
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
@@ -311,57 +309,49 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
 	// make sure at least one is published
 	// cache the write
-	counter := 0
 	startBlock := offset / DefaultConfig().BlockSize
 	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
 	currentBlock := info.Inode.Size / DefaultConfig().BlockSize
 	if offset > info.Inode.Size {
 		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
-		reads, err := p.readBlock(fd, int(currentBlock))
+		if info.Inode.Size%DefaultConfig().BlockSize == 0 {
+			p.publish(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
+		}
+		for startBlock > currentBlock {
+			currentBlock += 1
+			p.publish(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
+		}
+	}
+	if startBlock == endBlock {
+		tmp, err := p.readBlock(fd, int(startBlock))
 		if err != nil {
-			//unlock
 			return err
 		}
-		// 	for startBlock > currentBlock {
-		// 		currentBlock += 1
-		// 		p.publish(info.Filename, make([]byte, DefaultConfig().BlockSize))
-		// }
-		// 	p.publish(info.Filename, make([]byte, offset%DefaultConfig().BlockSize))
+		r := tmp[:offset%DefaultConfig().BlockSize]
+		r = append(r, data...)
+		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
+		p.publish(fd, int(startBlock), r)
+	} else {
+		tmp, err := p.readBlock(fd, int(startBlock))
+		if err != nil {
+			return err
+		}
+		r := tmp[:offset%DefaultConfig().BlockSize]
+		initbytes := DefaultConfig().BlockSize - offset%DefaultConfig().BlockSize
+		r = append(r, data[:initbytes]...)
+		p.publish(fd, int(startBlock), r)
+		for i := startBlock + 1; i <= endBlock-1; i++ {
+			r = data[initbytes+(i-startBlock-1)*DefaultConfig().BlockSize : initbytes+(i-startBlock)*DefaultConfig().BlockSize]
+			p.publish(fd, int(i), r)
+		}
+		tmp, err = p.readBlock(fd, int(endBlock))
+		if err != nil {
+			return err
+		}
+		r = data[initbytes+(endBlock-startBlock-1)*DefaultConfig().BlockSize:]
+		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
+		p.publish(fd, int(endBlock), r)
 	}
-	// if startBlock == endBlock {
-	// 	tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r := tmp[:offset%DefaultConfig().BlockSize]
-	// 	r = append(r, data...)
-	// 	r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
-	// 	p.publish(info.Filename, r)
-	// 	p.cache[fd][int(startBlock)] = r
-	// } else {
-	// 	tmp, err := p.readBlock(info.Filename, fd, int(startBlock))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r := tmp[:offset%DefaultConfig().BlockSize]
-	// 	initbytes := DefaultConfig().BlockSize - offset%DefaultConfig().BlockSize
-	// 	r = append(r, data[:initbytes]...)
-	// 	p.publish(info.Filename, r)
-	// 	p.cache[fd][int(startBlock)] = r
-	// 	for i := startBlock + 1; i <= endBlock-1; i++ {
-	// 		r = data[initbytes+(i-startBlock-1)*DefaultConfig().BlockSize : initbytes+(i-startBlock)*DefaultConfig().BlockSize]
-	// 		p.publish(info.Filename, r)
-	// 		p.cache[fd][int(i)] = r
-	// 	}
-	// 	tmp, err = p.readBlock(info.Filename, fd, int(endBlock))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	r = data[initbytes+(endBlock-startBlock-1)*DefaultConfig().BlockSize:]
-	// 	r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
-	// 	p.publish(info.Filename, r)
-	// 	p.cache[fd][int(endBlock)] = r
-	// }
 	p.info[fd].Modified[0] = true
 	p.info[fd].Inode.Size = p.info[fd].Inode.Size + 1
 	return err
@@ -387,6 +377,7 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 	if count == 0 {
 		return fmt.Errorf("none of publish success")
 	} else {
+		p.cache[fd][numBlock] = data
 		return nil
 	}
 }
