@@ -210,6 +210,9 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		//should we unlock?
 		return fmt.Errorf("write == false")
 	}
+	if offset > info.Inode.Size {
+		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
+	}
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
@@ -230,18 +233,60 @@ func (p *puddleStoreClient) Remove(path string) error {
 	//lock is not required for Remove
 	//if it is a dir, it should recursively remove its descendents
 	//TODO
+	exist, err := p.isFileExist(path)
+	if err != nil {
+		return err
+	}
+	if !exist {
+		return fmt.Errorf("not exist")
+	}
+	//lock
+	data, state, err := p.Conn.Get(path)
+	if err != nil {
+		//unlock
+		return err
+	}
+	node, err := decodeInode(data)
+	if err != nil {
+		//unlock
+		return err
+	}
+	//unlock
+	if node.IsDir {
+		//locked?
+		children, _, err := p.Conn.Children(path)
+		if err != nil {
+			return err
+		}
+		for _, s := range children {
+			p.Remove(s)
+		}
+		p.Conn.Delete(path, state.Version) //version
+	} else {
+		//locked?
+		//lock
+		p.Conn.Delete(path, state.Version)
+		//unlock
+	}
+
 	return nil
 }
 
 func (p *puddleStoreClient) List(path string) ([]string, error) {
 	//TODO
+	exist, err := p.isFileExist(path)
+	if err != nil {
+		return nil, err
+	}
+	if !exist {
+		return nil, fmt.Errorf("not exist")
+	}
 	children, _, err := p.Conn.Children(path)
 	if err != nil {
-		return children, err
+		return nil, err
 	}
 	return children, nil
 }
-
 func (p *puddleStoreClient) Exit() {
 	p.Conn.Close()
 	p.info = map[int]fileInfo{}
@@ -257,7 +302,7 @@ func (p *puddleStoreClient) ConnectRemote() (*tapestry.Client, error) {
 		return nil, err
 	}
 	remote, err := tapestry.Connect(string(addr))
-	return remote, nil
+	return remote, err
 }
 
 func (p *puddleStoreClient) ConnectRemotes() ([]*tapestry.Client, error) {

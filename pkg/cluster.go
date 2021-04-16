@@ -35,6 +35,7 @@ func (c *Cluster) NewClient() (Client, error) {
 		client.Conn = conn
 		return client, nil
 	}
+	go client.watch()
 }
 
 // CreateCluster starts all nodes necessary for puddlestore
