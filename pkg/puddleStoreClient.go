@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	tapestry "tapestry/pkg"
@@ -23,6 +24,7 @@ type fileInfo struct {
 
 type puddleStoreClient struct {
 	Conn      *zk.Conn
+	ClientMtx sync.Mutex             // Mutex for concurrent access to Client
 	cache     map[int]map[int][]byte //maintain a map from block num -> bytes or tapestry ID() TODO
 	fdCounter int
 	info      map[int]fileInfo //fd -> fileinfo
@@ -38,6 +40,7 @@ func (p *puddleStoreClient) init() {
 
 func (p *puddleStoreClient) getFd() int {
 	// if map FileDescripto does not contain fdCounter, return a copy of fdCounter, and increment fdCounter
+	// p.ClientMtx.Lock()
 	if _, ok := p.info[p.fdCounter]; !ok {
 		fd := p.fdCounter
 		if fd == math.MaxInt32 {
@@ -45,6 +48,7 @@ func (p *puddleStoreClient) getFd() int {
 		} else {
 			p.fdCounter = p.fdCounter + 1
 		}
+		// p.ClientMtx.Unlock()
 		return fd
 	}
 	// otherwise, increment fdCounter until the map does not contain fdCounter, return its copy and increment it
@@ -52,6 +56,7 @@ func (p *puddleStoreClient) getFd() int {
 		if _, ok := p.info[i]; !ok {
 			fd := i
 			p.fdCounter = i + 1
+			// p.ClientMtx.Unlock()
 			return fd
 		}
 	}
@@ -59,6 +64,7 @@ func (p *puddleStoreClient) getFd() int {
 		if _, ok := p.info[i]; !ok {
 			fd := i
 			p.fdCounter = i + 1
+			// p.ClientMtx.Unlock()
 			return fd
 		}
 	}
@@ -88,9 +94,9 @@ func (p *puddleStoreClient) unlock() {
 }
 
 func (p *puddleStoreClient) isFileExist(path string) (bool, error) {
-	//lock
+	//lock()
 	rlt, _, err := p.Conn.Exists(path)
-	//unlock
+	//unlock()
 	if err != nil {
 		return rlt, err
 	} else {
@@ -174,7 +180,9 @@ func (p *puddleStoreClient) underFile(path string) (bool, error) {
 	if len(dir) == 1 && dir[0] == 47 {
 		return false, nil
 	}
+	//lock()
 	data, _, err := p.Conn.Get(dir)
+	//unlock()
 	if err != nil {
 		return false, fmt.Errorf("zk err, %v", err)
 	}
@@ -328,6 +336,9 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		if err != nil {
 			return err
 		}
+		if len(tmp) == 0 {
+			tmp = make([]byte, DefaultConfig().BlockSize)
+		}
 		r := tmp[:offset%DefaultConfig().BlockSize]
 		r = append(r, data...)
 		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
@@ -413,7 +424,7 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 			}
 			return data, nil
 		}
-		return []byte{}, fmt.Errorf("get nothing, %v", node.Blocks[numBlock])
+		return []byte{}, nil
 	}
 }
 
