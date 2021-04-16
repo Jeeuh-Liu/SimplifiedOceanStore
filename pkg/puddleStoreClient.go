@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"path/filepath"
 	"time"
 
 	tapestry "tapestry/pkg"
@@ -430,5 +431,13 @@ func (p *puddleStoreClient) shuffleChildren() {
 	for i := len(p.children) - 1; i > 0; i-- {
 		j := rand.Intn(i + 1)
 		p.children[i], p.children[j] = p.children[j], p.children[i]
+	}
+}
+
+func (p *puddleStoreClient) connectAll() {
+	children, _, _, _ := p.Conn.ChildrenW("/tapestry")
+	for i := 0; i < len(children); i++ {
+		port, _, _ := p.Conn.Get(filepath.Join("/tapestry", children[i]))
+		tapestry.Connect(string(port))
 	}
 }
