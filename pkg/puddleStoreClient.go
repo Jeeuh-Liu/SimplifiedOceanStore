@@ -198,6 +198,7 @@ func (p *puddleStoreClient) Close(fd int) error {
 	//if flush is not needed unlock and return nil
 	if !info.Flush {
 		//unlock
+		delete(p.info, fd)
 		return nil
 	}
 	// //update metadata in zookeeper, then unlcok
@@ -227,10 +228,16 @@ func (p *puddleStoreClient) Close(fd int) error {
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original data array
-	// info, ok := p.info[fd]
-	_, ok := p.info[fd]
+	info, ok := p.info[fd]
 	if !ok {
 		return []byte{}, fmt.Errorf("invalid fd")
+	}
+	//handle edge case
+	if info.Inode.Size == 0 {
+		return []byte{}, nil
+	}
+	if offset > info.Inode.Size {
+		return []byte{}, nil
 	}
 	//calculate the blocks we need to read
 	// startBlock := offset / DefaultConfig().BlockSize
@@ -287,6 +294,10 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if !info.Flush {
 		//should we unlock?
 		return fmt.Errorf("write == false")
+	}
+	//handle edge case
+	if len(data) == 0 {
+		return nil
 	}
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
@@ -511,13 +522,5 @@ func (p *puddleStoreClient) shuffleChildren() {
 	for i := len(p.children) - 1; i > 0; i-- {
 		j := rand.Intn(i + 1)
 		p.children[i], p.children[j] = p.children[j], p.children[i]
-	}
-}
-
-func (p *puddleStoreClient) connectAll() {
-	children, _, _, _ := p.Conn.ChildrenW("/tapestry")
-	for i := 0; i < len(children); i++ {
-		port, _, _ := p.Conn.Get(filepath.Join("/tapestry", children[i]))
-		tapestry.Connect(string(port))
 	}
 }

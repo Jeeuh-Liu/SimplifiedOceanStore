@@ -115,3 +115,70 @@ func TestReadNonexistFile(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 }
+
+func TestNormalClose1(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Errorf("%v, %v", client, err)
+	}
+	fd, err := client.Open("/b.txt", true, false)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	err = client.Close(fd)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+}
+
+func TestNormalClose2(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Errorf("%v, %v", client, err)
+	}
+	fd, err := client.Open("/b.txt", true, true)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	err = client.Close(fd)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+}
+
+func TestReadClosedFile(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Errorf("%v, %v", client, err)
+	}
+	fd, err := client.Open("/b.txt", true, false)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	err = client.Close(fd)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	_, err = client.Read(fd, 0, 10)
+	if err == nil {
+		t.Errorf("the fd is invalid")
+	}
+}
