@@ -16,7 +16,7 @@ import (
 //may also need local map to provide concurrency
 
 type fileInfo struct {
-	Inode    inode
+	Inode    *inode
 	Flush    bool
 	Modified map[int]bool
 }
@@ -122,6 +122,7 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 				IsDir:    false,
 				Filename: path,
 				Blocks:   make(map[int][]string),
+				Size:     0,
 			}
 			data, err := encodeInode(node)
 			if err != nil {
@@ -139,7 +140,7 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 			fd = p.getFd()
 			p.info[fd] = fileInfo{
 				Flush:    write,
-				Inode:    node,
+				Inode:    &node,
 				Modified: make(map[int]bool),
 			}
 			p.info[0].Inode.Blocks[0] = append(p.info[fd].Inode.Blocks[0], "aaaa")
@@ -163,7 +164,7 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 	fd = p.getFd()
 	p.info[fd] = fileInfo{
 		Flush: write,
-		Inode: *node,
+		Inode: node,
 	}
 	return fd, nil
 }
@@ -206,7 +207,7 @@ func (p *puddleStoreClient) Close(fd int) error {
 	if len(info.Modified) != 0 {
 		path := info.Inode.Filename
 		//it should be inode here
-		data, err := encodeInode(info.Inode)
+		data, err := encodeInode(*info.Inode)
 		if err != nil {
 			//unlock
 			return fmt.Errorf("err in enode inode")
@@ -229,15 +230,14 @@ func (p *puddleStoreClient) Close(fd int) error {
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original data array
-	// info, ok := p.info[fd]
-	_, ok := p.info[fd]
+	info, ok := p.info[fd]
 	if !ok {
 		return []byte{}, fmt.Errorf("invalid fd")
 	}
 	//handle edge case
-	// if info.Inode.Size == 0 {
-	// 	return []byte{}, nil
-	// }
+	if info.Inode.Size == 0 {
+		return []byte{}, nil
+	}
 	// if offset > info.Inode.Size {
 	// 	return []byte{}, nil
 	// }
@@ -307,6 +307,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		return fmt.Errorf("problem in publish %v", err)
 	}
 	p.info[fd].Modified[0] = true
+	p.info[fd].Inode.Size = p.info[fd].Inode.Size + 1
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
