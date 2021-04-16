@@ -143,7 +143,6 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 				Inode:    &node,
 				Modified: make(map[int]bool),
 			}
-			p.info[0].Inode.Blocks[0] = append(p.info[fd].Inode.Blocks[0], "aaaa")
 			return fd, nil
 		}
 	}
