@@ -353,7 +353,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	}
 	p.info[fd].Modified[0] = true
 	p.info[fd].Inode.Size = p.info[fd].Inode.Size + 1
-	return err
+	return nil
 }
 
 func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
