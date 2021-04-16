@@ -166,6 +166,9 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 //You should retry a few times, between 3 to 10 times if anything fail
 func (p *puddleStoreClient) underFile(path string) (bool, error) {
 	dir := filepath.Dir(path)
+	if strings.Compare(path, "/") == 0 {
+		return false, nil
+	}
 	data, _, err := p.Conn.Get(dir)
 	if err != nil {
 		return false, err
