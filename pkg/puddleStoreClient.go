@@ -16,10 +16,9 @@ import (
 //may also need local map to provide concurrency
 
 type fileInfo struct {
-	Filename string
-	Inode    *inode
+	Inode    inode
 	Flush    bool
-	Modified map[int]string
+	Modified map[int]bool
 }
 
 type puddleStoreClient struct {
@@ -34,7 +33,7 @@ func (p *puddleStoreClient) init() {
 	p.cache = make(map[int]map[int][]byte)
 	p.fdCounter = 0
 	p.info = make(map[int]fileInfo)
-	p.children = make([]string, DefaultConfig().NumTapestry)
+	p.children = make([]string, 0)
 }
 
 func (p *puddleStoreClient) getFd() int {
@@ -122,6 +121,7 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 			node := inode{
 				IsDir:    false,
 				Filename: path,
+				Blocks:   make(map[int][]string),
 			}
 			data, err := encodeInode(node)
 			if err != nil {
@@ -138,10 +138,11 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 			}
 			fd = p.getFd()
 			p.info[fd] = fileInfo{
-				Filename: path,
 				Flush:    write,
-				Inode:    &node,
+				Inode:    node,
+				Modified: make(map[int]bool),
 			}
+			p.info[0].Inode.Blocks[0] = append(p.info[fd].Inode.Blocks[0], "aaaa")
 			return fd, nil
 		}
 	}
@@ -162,7 +163,7 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 	fd = p.getFd()
 	p.info[fd] = fileInfo{
 		Flush: write,
-		Inode: node,
+		Inode: *node,
 	}
 	return fd, nil
 }
@@ -203,9 +204,9 @@ func (p *puddleStoreClient) Close(fd int) error {
 	}
 	// //update metadata in zookeeper, then unlcok
 	if len(info.Modified) != 0 {
-		path := info.Filename
+		path := info.Inode.Filename
 		//it should be inode here
-		data, err := encodeInode(*info.Inode)
+		data, err := encodeInode(info.Inode)
 		if err != nil {
 			//unlock
 			return fmt.Errorf("err in enode inode")
@@ -228,17 +229,19 @@ func (p *puddleStoreClient) Close(fd int) error {
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original data array
-	info, ok := p.info[fd]
+	// info, ok := p.info[fd]
+	_, ok := p.info[fd]
 	if !ok {
 		return []byte{}, fmt.Errorf("invalid fd")
 	}
 	//handle edge case
-	if info.Inode.Size == 0 {
-		return []byte{}, nil
-	}
-	if offset > info.Inode.Size {
-		return []byte{}, nil
-	}
+	// if info.Inode.Size == 0 {
+	// 	return []byte{}, nil
+	// }
+	// if offset > info.Inode.Size {
+	// 	return []byte{}, nil
+	// }
+	data, err := p.readBlock(fd, 0)
 	//calculate the blocks we need to read
 	// startBlock := offset / DefaultConfig().BlockSize
 	// endBlock := info.Inode.Size / DefaultConfig().BlockSize
@@ -280,7 +283,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	// 	rlt = append(rlt, data...)
 	// }
 	// return rlt, nil
-	return nil, nil
+	return data, err
 }
 
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
@@ -299,6 +302,11 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if len(data) == 0 {
 		return nil
 	}
+	err := p.publish(fd, 0, data)
+	if err != nil {
+		return fmt.Errorf("problem in publish %v", err)
+	}
+	p.info[fd].Modified[0] = true
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
@@ -351,43 +359,57 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// 	p.publish(info.Filename, r)
 	// 	p.cache[fd][int(endBlock)] = r
 	// }
-	return nil
+	return err
 }
 
-func (p *puddleStoreClient) readBlock(filename string, fd, numBlock int) ([]byte, error) {
+func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
+	remotes, err := p.connectRemotes()
+	if err != nil {
+		return fmt.Errorf("connectRemotes, %v", err)
+	}
+	count := 0
+	for i, remote := range remotes {
+		filename := p.info[fd].Inode.Filename
+		saltname := filename + fmt.Sprint(i)
+		err = remote.Store(saltname, data)
+		if err != nil {
+			continue
+		} else {
+			p.info[0].Inode.Blocks[0] = append(p.info[fd].Inode.Blocks[numBlock], saltname)
+			count = count + 1
+		}
+	}
+	if count == 0 {
+		return fmt.Errorf("none of publish success")
+	} else {
+		return nil
+	}
+}
+
+func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 	if data, ok := p.cache[fd][numBlock]; ok {
 		return data, nil
 	} else {
 		remote, err := p.connectRemote()
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("problem in connectRemote, %v", err)
 		}
-		data, err = remote.Get(filename)
+		rawdata, _, err := p.Conn.Get(p.info[fd].Inode.Filename)
+		if err != nil {
+			return []byte{}, fmt.Errorf("get inode, filename %v, %v", p.info[fd].Inode.Filename, err)
+		}
+		node, err := decodeInode(rawdata)
 		if err != nil {
 			return []byte{}, err
 		}
-		return data, nil
-	}
-}
-
-func (p *puddleStoreClient) publish(filename string, data []byte) error {
-	remotes, err := p.connectRemotes()
-	if err != nil {
-		return err
-	}
-	success := false
-	for i, remote := range remotes {
-		err = remote.Store(filename+string(i), data)
-		if err != nil {
-			continue
-		} else {
-			success = true
+		for _, saltname := range node.Blocks[numBlock] {
+			data, err = remote.Get(saltname)
+			if err != nil {
+				continue
+			}
+			return data, nil
 		}
-	}
-	if !success {
-		return fmt.Errorf("none of publish success")
-	} else {
-		return nil
+		return []byte{}, fmt.Errorf("get nothing, %v", node.Blocks[numBlock])
 	}
 }
 
@@ -467,7 +489,7 @@ func (p *puddleStoreClient) Exit() {
 func (p *puddleStoreClient) connectRemote() (*tapestry.Client, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
 	rand.Seed(time.Now().UnixNano())
-	path := p.children[rand.Intn(len(p.children))]
+	path := "/tapestry/" + p.children[rand.Intn(len(p.children))]
 	addr, _, err := p.Conn.Get(path)
 	if err != nil {
 		return nil, err
@@ -482,10 +504,10 @@ func (p *puddleStoreClient) connectRemotes() ([]*tapestry.Client, error) {
 	var remotes []*tapestry.Client
 	p.shuffleChildren()
 	for i := 0; i < len(p.children) && len(remotes) < DefaultConfig().NumReplicas; i++ {
-		path := p.children[i]
+		path := "/tapestry/" + p.children[i]
 		addr, _, err := p.Conn.Get(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("path name %v, %v", path, err)
 		}
 		remote, err := tapestry.Connect(string(addr))
 		if err == nil {

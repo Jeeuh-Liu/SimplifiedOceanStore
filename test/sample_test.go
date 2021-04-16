@@ -3,6 +3,7 @@ package test
 import (
 	puddlestore "puddlestore/pkg"
 	"testing"
+	"time"
 )
 
 func writeFile(client puddlestore.Client, path string, offset uint64, data []byte) error {
@@ -25,13 +26,6 @@ func readFile(client puddlestore.Client, path string, offset, size uint64) ([]by
 	return client.Read(fd, offset, size)
 }
 
-func TestNotUse(t *testing.T) {
-	zkConn, _ := puddlestore.ConnectZk(puddlestore.DefaultConfig().ZkAddr)
-	children, state, _ := zkConn.Children("/")
-	for _, child := range children {
-		zkConn.Delete(child, state.Version)
-	}
-}
 func TestReadWrite(t *testing.T) {
 	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
 	if err != nil {
@@ -48,30 +42,19 @@ func TestReadWrite(t *testing.T) {
 	}
 
 	in := "test"
-	fd, err := client.Open("/a", true, true)
-	t.Errorf("%v, %v", fd, err)
 
-	err = client.Write(fd, 0, []byte(in))
-	t.Errorf("%v, %v", fd, err)
-
-	zkConn, _ := puddlestore.ConnectZk(puddlestore.DefaultConfig().ZkAddr)
-	children, state, _ := zkConn.Children("/")
-	for _, child := range children {
-		zkConn.Delete(child, state.Version)
+	if err := writeFile(client, "/a", 0, []byte(in)); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	var out []byte
+	if out, err = readFile(client, "/a", 0, 5); err != nil {
+		t.Fatal(err)
 	}
 
-	// if err := writeFile(client, "/a", 0, []byte(in)); err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	// var out []byte
-	// if out, err = readFile(client, "/a", 0, 5); err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	// if in != string(out) {
-	// 	t.Fatalf("Expected: %v, Got: %v", in, string(out))
-	// }
+	if in != string(out) {
+		t.Fatalf("Expected: %v, Got: %v", in, string(out))
+	}
 }
 
 func TestClient(t *testing.T) {
