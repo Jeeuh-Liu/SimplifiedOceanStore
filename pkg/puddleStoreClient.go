@@ -223,7 +223,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	// 	if data, ok := p.cache[fd][int(startBlock)]; ok {
 	// 		rlt = append(rlt, data...)
 	// 	} else {
-	// 		remote, err := p.ConnectRemote()
+	// 		remote, err := p.connectRemote()
 	// 		if err != nil {
 	// 			//unlock
 	// 			return []byte{}, err
@@ -278,7 +278,7 @@ func (p *puddleStoreClient) readBlock(filename string, fd, numBlock int) ([]byte
 	if data, ok := p.cache[fd][numBlock]; ok {
 		return data, nil
 	} else {
-		remote, err := p.ConnectRemote()
+		remote, err := p.connectRemote()
 		if err != nil {
 			return []byte{}, err
 		}
@@ -291,7 +291,7 @@ func (p *puddleStoreClient) readBlock(filename string, fd, numBlock int) ([]byte
 }
 
 func (p *puddleStoreClient) publish(filename string, data []byte) error {
-	remotes, err := p.ConnectRemotes()
+	remotes, err := p.connectRemotes()
 	if err != nil {
 		return err
 	}
@@ -382,7 +382,7 @@ func (p *puddleStoreClient) Exit() {
 	//cleanup (like all the opened fd) and all subsequent calls should return an error
 }
 
-func (p *puddleStoreClient) ConnectRemote() (*tapestry.Client, error) {
+func (p *puddleStoreClient) connectRemote() (*tapestry.Client, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
 	rand.Seed(time.Now().UnixNano())
 	path := p.children[rand.Intn(len(p.children))]
@@ -394,7 +394,7 @@ func (p *puddleStoreClient) ConnectRemote() (*tapestry.Client, error) {
 	return remote, err
 }
 
-func (p *puddleStoreClient) ConnectRemotes() ([]*tapestry.Client, error) {
+func (p *puddleStoreClient) connectRemotes() ([]*tapestry.Client, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
 	//choose  random remote paths from p.children
 	var remotes []*tapestry.Client
