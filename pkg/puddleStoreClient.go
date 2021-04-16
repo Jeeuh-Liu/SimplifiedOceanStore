@@ -229,7 +229,9 @@ func (p *puddleStoreClient) Close(fd int) error {
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original data array
+	p.lock()
 	info, ok := p.info[fd]
+	p.unlock()
 	if !ok {
 		return []byte{}, fmt.Errorf("invalid fd")
 	}
@@ -366,9 +368,7 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 		filename := p.info[fd].Inode.Filename
 		saltname := filename + fmt.Sprint(i)
 		err = remote.Store(saltname, data)
-		if err != nil {
-			continue
-		} else {
+		if err == nil {
 			p.info[0].Inode.Blocks[0] = append(p.info[fd].Inode.Blocks[numBlock], saltname)
 			count = count + 1
 		}
@@ -382,7 +382,13 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 }
 
 func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
-	if data, ok := p.cache[fd][numBlock]; ok {
+	// p.lock()
+	// zkConn := p.Conn
+	// p.unlock()
+	p.lock()
+	data, ok := p.cache[fd][numBlock]
+	p.unlock()
+	if ok {
 		return data, nil
 	} else {
 		remote, err := p.connectRemote()
@@ -482,19 +488,28 @@ func (p *puddleStoreClient) Exit() {
 
 func (p *puddleStoreClient) connectRemote() (*tapestry.Client, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
-	rand.Seed(time.Now().UnixNano())
-	path := "/tapestry/" + p.children[rand.Intn(len(p.children))]
-	addr, _, err := p.Conn.Get(path)
-	if err != nil {
-		return nil, err
+	err := fmt.Errorf("")
+	for i := 0; i < 5; i += 1 {
+		rand.Seed(time.Now().UnixNano())
+		path := "/tapestry/" + p.children[rand.Intn(len(p.children))]
+		addr, _, err := p.Conn.Get(path)
+		if err != nil {
+			continue
+		}
+		remote, err := tapestry.Connect(string(addr))
+		if err != nil {
+			continue
+		}
+		return remote, err
 	}
-	remote, err := tapestry.Connect(string(addr))
-	return remote, err
+	return nil, err
 }
 
 func (p *puddleStoreClient) connectRemotes() ([]*tapestry.Client, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
 	//choose  random remote paths from p.children
+
+	////retry!!!!!!!
 	var remotes []*tapestry.Client
 	p.shuffleChildren()
 	for i := 0; i < len(p.children) && len(remotes) < DefaultConfig().NumReplicas; i++ {
