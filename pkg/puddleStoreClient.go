@@ -28,6 +28,13 @@ type puddleStoreClient struct {
 	children  []string
 }
 
+func (p *puddleStoreClient) init() {
+	p.cache = make(map[int]map[int][]byte)
+	p.fdCounter = 0
+	p.info = make(map[int]fileInfo)
+	p.children = make([]string, DefaultConfig().NumTapestry*5)
+}
+
 func (p *puddleStoreClient) getFd() int {
 	// if map FileDescripto does not contain fdCounter, return a copy of fdCounter, and increment fdCounter
 	if _, ok := p.info[p.fdCounter]; !ok {

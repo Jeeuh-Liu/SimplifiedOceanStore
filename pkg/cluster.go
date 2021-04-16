@@ -33,6 +33,7 @@ func (c *Cluster) NewClient() (Client, error) {
 		return client, err
 	} else {
 		client.Conn = conn
+		client.init()
 		go client.watch()
 		return client, nil
 	}
