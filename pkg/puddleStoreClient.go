@@ -102,7 +102,7 @@ func (p *puddleStoreClient) isFileExist(path string) (bool, error) {
 func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 	fd := -1
 	if strings.Compare(path, "/") == 0 {
-		return fd, nil
+		return fd, fmt.Errorf("should not open Root")
 	}
 	exist, err := p.isFileExist(path)
 	if err != nil {
@@ -405,19 +405,18 @@ func (p *puddleStoreClient) Remove(path string) error {
 }
 
 func (p *puddleStoreClient) List(path string) ([]string, error) {
-	// exist, err := p.isFileExist(path)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if !exist {
-	// 	return nil, fmt.Errorf("not exist")
-	// }
-	// children, _, err := p.Conn.Children(path)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return children, nil
-	return nil, nil
+	exist, err := p.isFileExist(path)
+	if err != nil {
+		return nil, err
+	}
+	if !exist {
+		return nil, fmt.Errorf("not exist")
+	}
+	children, _, err := p.Conn.Children(path)
+	if err != nil {
+		return nil, err
+	}
+	return children, nil
 }
 func (p *puddleStoreClient) Exit() {
 	p.Conn.Close()
