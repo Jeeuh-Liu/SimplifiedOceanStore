@@ -320,3 +320,68 @@ func TestRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestReadWrite2(t *testing.T) {
+	config := puddlestore.Config{
+		BlockSize:   4,
+		NumReplicas: 2,
+		NumTapestry: 2,
+		ZkAddr:      "localhost:2181", // restore to localhost:2181 before submitting
+	}
+	cluster, err := puddlestore.CreateCluster(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	in := "test"
+
+	if err := writeFile(client, "/a", 4, []byte(in)); err != nil {
+		t.Fatal(err)
+	}
+	var out []byte
+	if out, err = readFile(client, "/a", 4, 4); err != nil {
+		t.Fatal(err)
+	}
+	if in != string(out) {
+		t.Fatalf("Expected: %v %v, Got: %v %v", in, len(in), string(out), len(out))
+	}
+
+	err = client.Remove("/a")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOpenSameFile(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client2, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/a"
+
+	fd, err := client.Open(path, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fd2, err := client2.Open(path, true, true)
+	if err == nil {
+		t.Fatal("two files opend")
+	}
+	client.Close(fd)
+	client2.Close(fd2)
+}
