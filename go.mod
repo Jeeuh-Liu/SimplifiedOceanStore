@@ -10,4 +10,6 @@ require (
 )
 
 // Replace this
-replace tapestry => /tapestry-ta-implementation-master
+replace tapestry => ./tapestry-ta-implementation-master/
+
+// replace tapestry => /vagrant/puddlestore-zlyu6-zliu178/tapestry-ta-implementation-master
