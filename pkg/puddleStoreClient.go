@@ -371,10 +371,10 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	//should return a copy of original data array and the client should be able to read its own write
 	//if anything fail, should we clear fd?
-	// p.ClientMtx.Lock()
+	p.ClientMtx.Lock()
 	// return fmt.Errorf("%v, %v, %v, %v", len(data), offset, p.config.BlockSize, data)
 	info, ok := p.info[fd]
-	// p.ClientMtx.Unlock()
+	p.ClientMtx.Unlock()
 	if !ok {
 		return fmt.Errorf("invalid fd")
 	}
@@ -472,7 +472,9 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		p.savecache(fd, int(endBlock), r)
 	}
 	if offset+uint64(dataLen) > p.info[fd].Inode.Size {
+		p.ClientMtx.Lock()
 		p.info[fd].Inode.Size = offset + uint64(dataLen)
+		p.ClientMtx.Unlock()
 	}
 	return nil
 }
