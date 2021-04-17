@@ -15,6 +15,7 @@ import (
 )
 
 //may also need local map to provide concurrency
+const RETRY = 10
 
 type fileInfo struct {
 	Inode    *inode
@@ -224,7 +225,10 @@ func (p *puddleStoreClient) Close(fd int) error {
 	}
 	// //update metadata in zookeeper, then unlcok
 	if len(info.Modified) != 0 {
-		p.publish(fd)
+		err := p.publish(fd)
+		for err != nil {
+			err = p.publish(fd)
+		}
 		path := info.Inode.Filename
 		//it should be inode here
 		data, err := encodeInode(*info.Inode)
@@ -263,6 +267,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		return []byte{}, nil
 	}
 	if offset > info.Inode.Size {
+		// return []byte{}, fmt.Errorf("reach here, %v", info.Inode.Size)
 		return []byte{}, nil
 	}
 
@@ -277,18 +282,23 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 
 	startBlock := offset / p.config.BlockSize
 	endBlock := boundary / p.config.BlockSize
-	offset = offset % p.config.BlockSize
+	offsetFirstBlock := offset % p.config.BlockSize
 	if startBlock == endBlock {
 		//first read from cache
 		data, err := p.readBlock(fd, int(startBlock))
-		if err != nil {
-			return []byte{}, err
-		}
-		if len(data) == 0 {
-			return []byte{}, fmt.Errorf("unexpected error")
+		if len(data) == 0 || err != nil {
+			for i := 0; i < RETRY; i++ {
+				data, err = p.readBlock(fd, int(startBlock))
+				if err == nil && len(data) != 0 {
+					break
+				}
+			}
+			if err != nil || len(data) != 0 {
+				return []byte{}, err
+			}
 		}
 		//cache it
-		return data[offset:(offset + size)], nil
+		return data[offsetFirstBlock:(offsetFirstBlock + size)], nil
 	}
 	var rlt []byte
 	var bytesRead uint64
@@ -296,16 +306,21 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	for i := startBlock; i <= endBlock; i++ {
 		//if cached, read locally
 		data, err := p.readBlock(fd, int(i))
-		if err != nil {
-			return []byte{}, err
-		}
-		if len(data) == 0 {
-			return []byte{}, fmt.Errorf("unexpected error")
+		if len(data) == 0 || err != nil {
+			for i := 0; i < RETRY; i++ {
+				data, err = p.readBlock(fd, int(startBlock))
+				if err == nil && len(data) != 0 {
+					break
+				}
+			}
+			if err != nil || len(data) != 0 {
+				return []byte{}, err
+			}
 		}
 		//cache it
 		if i == startBlock {
-			data = data[offset:]
-			bytesRead = bytesRead + uint64(len(data)) - offset
+			data = data[offsetFirstBlock:]
+			bytesRead = bytesRead + uint64(len(data)) - offsetFirstBlock
 		} else {
 			if i == endBlock {
 				left := size - bytesRead
@@ -325,7 +340,8 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	//should return a copy of original data array and the client should be able to read its own write
 	//if anything fail, should we clear fd?
 	// p.ClientMtx.Lock()
-	return fmt.Errorf("%v, %v, %v, %v", len(data), offset, p.config.BlockSize, data)
+	// return fmt.Errorf("%v, %v, %v, %v", len(data), offset, p.config.BlockSize, data)
+
 	info, ok := p.info[fd]
 	// p.ClientMtx.Unlock()
 	if !ok {
@@ -429,7 +445,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if offset+uint64(len(data)) > p.info[fd].Inode.Size {
 		p.info[fd].Inode.Size = offset + uint64(len(data))
 	}
-	// return fmt.Errorf("%v", len(info.Modified))
+	// return fmt.Errorf("%v, %v, %v", offset, len(data), p.info[fd].Inode.Size)
 	return nil
 }
 
@@ -455,7 +471,7 @@ func (p *puddleStoreClient) publish(fd int) error {
 			saltname := p.info[fd].Inode.Filename + tapestry.RandomID().String()
 			err = remote.Store(saltname, p.cache[fd][numBlock])
 			if err == nil {
-				p.info[fd].Inode.Blocks[fd] = append(p.info[fd].Inode.Blocks[numBlock], saltname)
+				p.info[fd].Inode.Blocks[numBlock] = append(p.info[fd].Inode.Blocks[numBlock], saltname)
 				success[numBlock] = true
 			}
 		}
@@ -498,7 +514,7 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 			}
 			return data, nil
 		}
-		return []byte{}, nil
+		return []byte{}, fmt.Errorf("need to reread")
 	}
 }
 
