@@ -766,45 +766,9 @@ func (p *puddleStoreClient) publish(fd int) error {
 }
 
 func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
-	// p.lock()
-	// zkConn := p.Conn
-	// p.unlock()
-	// p.ClientMtx.Lock()
+	p.ClientMtx.Lock()
 	data, ok := p.cache[fd][numBlock]
-	// p.ClientMtx.Unlock()
-	if ok {
-		return data, nil
-	} else {
-		remote, err := p.connectRemote()
-		if err != nil {
-			return []byte{}, fmt.Errorf("problem in connectRemote, %v", err)
-		}
-		rawdata, _, err := p.Conn.Get(p.info[fd].Inode.Filename)
-		if err != nil {
-			return []byte{}, fmt.Errorf("get inode, filename %v, %v", p.info[fd].Inode.Filename, err)
-		}
-		node, err := decodeInode(rawdata)
-		if err != nil {
-			return []byte{}, err
-		}
-		for _, saltname := range node.Blocks[numBlock] {
-			data, err = remote.Get(saltname)
-			if err != nil {
-				continue
-			}
-			return data, nil
-		}
-		return []byte{}, nil
-	}
-}
-
-func (p *puddleStoreClient) readBlock2(fd, numBlock int) ([]byte, error) {
-	// p.lock()
-	// zkConn := p.Conn
-	// p.unlock()
-	// p.ClientMtx.Lock()
-	data, ok := p.cache[fd][numBlock]
-	// p.ClientMtx.Unlock()
+	p.ClientMtx.Unlock()
 	if ok {
 		return data, nil
 	} else {
