@@ -50,10 +50,10 @@ func CreateCluster(config Config) (*Cluster, error) {
 	}
 	path := "/tapestry"
 	data := []byte("tapestry directory")
-	_, err = zkConn.Create(path, data, 0, zk.WorldACL(zk.PermAll))
-	if err != nil {
-		return nil, fmt.Errorf("problem in create tapestry dir, %v", err)
-	}
+	zkConn.Create(path, data, 0, zk.WorldACL(zk.PermAll))
+	// if err != nil {
+	// 	return nil, fmt.Errorf("problem in create tapestry dir, %v", err)
+	// }
 	// TODO: Start your tapestry cluster with size config.NumTapestry.
 	var c Cluster
 	c.config.ZkAddr = config.ZkAddr
