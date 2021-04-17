@@ -103,15 +103,17 @@ func TestConWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	in := "testtesttesttesttesttesttesttesttesttesttesttest"
+	in := "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest"
+
+	go func(client puddlestore.Client) {
+		in := "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest"
+		writeFile(client, "/a", 0, []byte(in))
+	}(client)
 
 	if err := writeFile(client, "/a", 0, []byte(in)); err != nil {
 		t.Fatal(err)
 	}
-	go func(client puddlestore.Client) {
-		in := "testtesttesttesttesttesttesttesttesttesttesttest"
-		writeFile(client, "/a", 0, []byte(in))
-	}(client)
+
 	time.Sleep(time.Second)
 }
 func TestWriteEmptyWithOffset(t *testing.T) {
@@ -384,4 +386,28 @@ func TestOpenSameFile(t *testing.T) {
 	}
 	client.Close(fd)
 	client2.Close(fd2)
+}
+
+func TestList(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Mkdir("/b")
+	path := "/b/a"
+	fd, err := client.Open(path, true, true)
+	_, err = client.List("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Remove("/b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Close(fd)
 }
