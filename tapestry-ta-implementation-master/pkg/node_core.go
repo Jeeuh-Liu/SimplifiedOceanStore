@@ -137,8 +137,8 @@ func (local *Node) Publish(key string) (cancel chan bool, err error) {
 				}
 			case <-cancel:
 				{
-					Trace.Printf("Stopping advertisement of %v", key)
-					fmt.Printf("Stopping advertisement for %v\n", key)
+					// Trace.Printf("Stopping advertisement of %v", key)
+					// fmt.Printf("Stopping advertisement for %v\n", key)
 					return
 				}
 			}
@@ -295,7 +295,6 @@ func (local *Node) Transfer(from RemoteNode, replicaMap map[string][]RemoteNode)
 	// __END_STUDENT__
 	return nil
 }
-
 
 // calls FindRoot on a remote node with given ID
 func (local *Node) FindRootOnRemoteNode(start RemoteNode, id ID) (RemoteNode, error) {
