@@ -3,6 +3,7 @@ package test
 import (
 	puddlestore "puddlestore/pkg"
 	"testing"
+	"time"
 )
 
 func writeFile(client puddlestore.Client, path string, offset uint64, data []byte) error {
@@ -90,40 +91,62 @@ func TestReadWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+func TestConWrite(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// func TestWriteEmptyWithOffset(t *testing.T) {
-// 	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	defer cluster.Shutdown()
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	client, err := cluster.NewClient()
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	in := "testtesttesttesttesttesttesttesttesttesttesttest"
 
-// 	in := "muddle"
+	if err := writeFile(client, "/a", 0, []byte(in)); err != nil {
+		t.Fatal(err)
+	}
+	go func(client puddlestore.Client) {
+		in := "testtesttesttesttesttesttesttesttesttesttesttest"
+		writeFile(client, "/a", 0, []byte(in))
+	}(client)
+	time.Sleep(time.Second)
+}
+func TestWriteEmptyWithOffset(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
 
-// 	for i := 0; i < 100; i++ {
-// 		// i := 58
-// 		if err := writeFile(client, "/a", uint64(i), []byte(in)); err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		var out []byte
-// 		if out, err = readFile(client, "/a", uint64(i), 6); err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		if in != string(out) {
-// 			t.Fatalf("at %v iter, Expected: %v %v, Got: %v %v", i, []byte(in), len(in), out, len(out))
-// 		}
-// 	}
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	err = client.Remove("/a")
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// }
+	in := "muddle"
+
+	for i := 0; i < 5; i++ {
+		// i := 58
+		if err := writeFile(client, "/a", uint64(i), []byte(in)); err != nil {
+			t.Errorf("%v", err)
+		}
+		var out []byte
+		if out, err = readFile(client, "/a", uint64(i), 6); err != nil {
+			t.Errorf("%v", err)
+		}
+		if in != string(out) {
+			t.Errorf("at %v iter, Expected: %v %v, Got: %v %v", i, []byte(in), len(in), out, len(out))
+		}
+	}
+
+	err = client.Remove("/a")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestClient(t *testing.T) {
 	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
