@@ -238,6 +238,28 @@ func (p *puddleStoreClient) Close(fd int) error {
 			return err
 		}
 	}
+	remotes, err := p.connectRemotes()
+	if err != nil {
+		return fmt.Errorf("connectRemotes, %v", err)
+	}
+	count := 0
+	for key, data := range p.cache[fd] {
+		if _, ok := p.info[fd].Modified[key]; ok {
+			for _, remote := range remotes {
+				filename := p.info[fd].Inode.Filename
+				saltname := filename + tapestry.RandomID().String()
+				err = remote.Store(saltname, data)
+				if err == nil {
+					p.info[0].Inode.Blocks[key] = append(p.info[fd].Inode.Blocks[key], saltname)
+					count = count + 1
+				}
+			}
+		}
+	}
+	if count == 0 {
+		return fmt.Errorf("none of publish success")
+	}
+
 	// //clear fd
 	// p.ClientMtx.Lock()
 	delete(p.info, fd)
@@ -409,6 +431,7 @@ func (p *puddleStoreClient) savecache(fd, numBlock int, data []byte) {
 		p.cache[fd] = make(map[int][]byte)
 	}
 	p.cache[fd][numBlock] = data
+	p.info[fd].Modified[numBlock] = true
 	// p.ClientMtx.Unock()
 }
 
@@ -419,7 +442,7 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 	}
 	count := 0
 	// p.ClientMtx.Lock()
-	for i, remote := range remotes {
+	for _, remote := range remotes {
 		filename := p.info[fd].Inode.Filename
 		saltname := filename + tapestry.RandomID().String()
 		err = remote.Store(saltname, data)
