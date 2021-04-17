@@ -397,8 +397,8 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 			p.savecache(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
 		}
 		for startBlock > currentBlock {
-			p.savecache(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
 			currentBlock += 1
+			p.savecache(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
 		}
 	}
 	if startBlock == endBlock {
