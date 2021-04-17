@@ -738,12 +738,14 @@ func (p *puddleStoreClient) savecache(fd, numBlock int, data []byte) {
 }
 
 func (p *puddleStoreClient) publish(fd int) error {
-	// p.ClientMtx.Lock()
+	p.ClientMtx.Lock()
 	for numBlock := range p.info[fd].Modified {
 		p.info[fd].Inode.Blocks[numBlock] = make([]string, 0)
 		success := false
 		for i := 0; i < p.config.NumReplicas; i++ {
+			p.ClientMtx.Unlock()
 			remote, err := p.connectRemote()
+			p.ClientMtx.Lock()
 			if err != nil {
 				continue
 			}
@@ -755,11 +757,12 @@ func (p *puddleStoreClient) publish(fd int) error {
 			}
 		}
 		if !success {
+			p.ClientMtx.Unlock()
 			return fmt.Errorf("at least one block fails to publish")
 		}
 	}
+	p.ClientMtx.Unlock()
 	return nil
-	// p.ClientMtx.Unlock()
 }
 
 func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
