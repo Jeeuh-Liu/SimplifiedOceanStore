@@ -364,32 +364,29 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
 	// make sure at least one is published
 	// cache the write
-	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
-	if info.Inode.Size == 0 {
-		var size uint64 = 0
-		for i := 0; i < int(endBlock); i++ {
-			piece := data[:DefaultConfig().BlockSize]
-			data = data[DefaultConfig().BlockSize:]
-			p.savecache(fd, i, piece)
-			size += DefaultConfig().BlockSize
-		}
-		piece := make([]byte, DefaultConfig().BlockSize)
-		for i, v := range data {
-			piece[i] = v
-		}
-		p.savecache(fd, int(endBlock), piece)
-		size = size + uint64(len(data))
-		for i := 0; i <= int(endBlock); i++ {
-			p.info[fd].Modified[i] = true
-		}
-		p.info[fd].Inode.Size += uint64(size)
-		return nil
-	}
 	currentBlock := info.Inode.Size / DefaultConfig().BlockSize
 	startBlock := offset / DefaultConfig().BlockSize
-	if currentBlock < startBlock {
-
-	}
+	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
+	// if info.Inode.Size == 0 {
+	// 	var size uint64 = 0
+	// 	for i := 0; i < int(endBlock); i++ {
+	// 		piece := data[:DefaultConfig().BlockSize]
+	// 		data = data[DefaultConfig().BlockSize:]
+	// 		p.savecache(fd, i, piece)
+	// 		size += DefaultConfig().BlockSize
+	// 	}
+	// 	piece := make([]byte, DefaultConfig().BlockSize)
+	// 	for i, v := range data {
+	// 		piece[i] = v
+	// 	}
+	// 	p.savecache(fd, int(endBlock), piece)
+	// 	size = size + uint64(len(data))
+	// 	for i := 0; i <= int(endBlock); i++ {
+	// 		p.info[fd].Modified[i] = true
+	// 	}
+	// 	p.info[fd].Inode.Size += uint64(size)
+	// 	return nil
+	// }
 
 	if offset > info.Inode.Size {
 		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
@@ -397,8 +394,8 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 			p.savecache(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
 		}
 		for startBlock > currentBlock {
-			currentBlock += 1
 			p.savecache(fd, int(currentBlock), make([]byte, DefaultConfig().BlockSize))
+			currentBlock += 1
 		}
 	}
 	if startBlock == endBlock {
@@ -449,7 +446,7 @@ func (p *puddleStoreClient) savecache(fd, numBlock int, data []byte) {
 		p.cache[fd] = make(map[int][]byte)
 	}
 	p.cache[fd][numBlock] = data
-	// p.info[fd].Modified[numBlock] = true
+	p.info[fd].Modified[numBlock] = true
 	// p.ClientMtx.Unock()
 }
 
