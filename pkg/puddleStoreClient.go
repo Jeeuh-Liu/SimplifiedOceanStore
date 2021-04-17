@@ -223,7 +223,7 @@ func (p *puddleStoreClient) Close(fd int) error {
 	}
 	// //update metadata in zookeeper, then unlcok
 	if len(info.Modified) != 0 {
-		// p.publish(fd)
+		p.publish(fd)
 		path := info.Inode.Filename
 		//it should be inode here
 		data, err := encodeInode(*info.Inode)
