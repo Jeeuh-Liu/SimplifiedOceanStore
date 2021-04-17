@@ -161,13 +161,13 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 				return fd, err
 			}
 			fd = p.getFd()
-			// p.ClientMtx.Lock()
+			p.ClientMtx.Lock()
 			p.info[fd] = fileInfo{
 				Flush:    write,
 				Inode:    &node,
 				Modified: make(map[int]bool),
 			}
-			// p.ClientMtx.Unlock()
+			p.ClientMtx.Unlock()
 			return fd, nil
 		}
 	}
@@ -185,14 +185,14 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 	if node.IsDir {
 		return fd, fmt.Errorf("it's a directory")
 	}
-	// p.ClientMtx.Lock()
 	fd = p.getFd()
+	p.ClientMtx.Lock()
 	p.info[fd] = fileInfo{
 		Flush:    write,
 		Inode:    node,
 		Modified: make(map[int]bool),
 	}
-	// p.ClientMtx.Unlock()
+	p.ClientMtx.Unlock()
 	return fd, nil
 }
 
@@ -222,18 +222,18 @@ func (p *puddleStoreClient) underFile(path string) (bool, error) {
 
 func (p *puddleStoreClient) Close(fd int) error {
 	//if the map p.Info does not contains fd, return error
-	// p.ClientMtx.Lock()
+	p.ClientMtx.Lock()
 	info, ok := p.info[fd]
-	// p.ClientMtx.Unlock()
+	p.ClientMtx.Unlock()
 	if !ok {
 		return fmt.Errorf("invalid fd")
 	}
 	//if flush is not needed unlock and return nil
 	if !info.Flush {
 		p.unlock()
-		// p.ClientMtx.Lock()
+		p.ClientMtx.Lock()
 		delete(p.info, fd)
-		// p.ClientMtx.Unlock()
+		p.ClientMtx.Unlock()
 		return nil
 	}
 	// //update metadata in zookeeper, then unlcok
