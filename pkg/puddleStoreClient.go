@@ -385,8 +385,11 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		p.info[fd].Inode.Size += uint64(size)
 		return nil
 	}
-	startBlock := offset / DefaultConfig().BlockSize
 	currentBlock := info.Inode.Size / DefaultConfig().BlockSize
+	startBlock := offset / DefaultConfig().BlockSize
+	if currentBlock < startBlock {
+
+	}
 
 	if offset > info.Inode.Size {
 		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
