@@ -281,8 +281,9 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		return []byte{}, nil
 	}
 	if offset > info.Inode.Size {
-		return []byte{}, nil
+		return []byte{}, fmt.Errorf("read herer %v", info.Inode.Size)
 	}
+
 	// data, err := p.readBlock(fd, 0)
 	//calculate the blocks we need to read
 	boundary := info.Inode.Size
@@ -368,24 +369,26 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	startBlock := offset / DefaultConfig().BlockSize
 	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
 	// if info.Inode.Size == 0 {
-	// 	var size uint64 = 0
-	// 	for i := 0; i < int(endBlock); i++ {
-	// 		piece := data[:DefaultConfig().BlockSize]
-	// 		data = data[DefaultConfig().BlockSize:]
-	// 		p.savecache(fd, i, piece)
-	// 		size += DefaultConfig().BlockSize
+	// 	if offset == 0{
+	// 		var size uint64 = 0
+	// 		for i := 0; i < int(endBlock); i++ {
+	// 			piece := data[:DefaultConfig().BlockSize]
+	// 			data = data[DefaultConfig().BlockSize:]
+	// 			p.savecache(fd, i, piece)
+	// 			size += DefaultConfig().BlockSize
+	// 		}
+	// 		piece := make([]byte, DefaultConfig().BlockSize)
+	// 		for i, v := range data {
+	// 			piece[i] = v
+	// 		}
+	// 		p.savecache(fd, int(endBlock), piece)
+	// 		size = size + uint64(len(data))
+	// 		for i := 0; i <= int(endBlock); i++ {
+	// 			p.info[fd].Modified[i] = true
+	// 		}
+	// 		p.info[fd].Inode.Size += uint64(size)
+	// 		return nil
 	// 	}
-	// 	piece := make([]byte, DefaultConfig().BlockSize)
-	// 	for i, v := range data {
-	// 		piece[i] = v
-	// 	}
-	// 	p.savecache(fd, int(endBlock), piece)
-	// 	size = size + uint64(len(data))
-	// 	for i := 0; i <= int(endBlock); i++ {
-	// 		p.info[fd].Modified[i] = true
-	// 	}
-	// 	p.info[fd].Inode.Size += uint64(size)
-	// 	return nil
 	// }
 
 	if offset > info.Inode.Size {
@@ -422,21 +425,27 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		initbytes := DefaultConfig().BlockSize - offset%DefaultConfig().BlockSize
 		r = append(r, data[:initbytes]...)
 		p.savecache(fd, int(startBlock), r)
-		for i := startBlock + 1; i <= endBlock-1; i++ {
-			r = data[initbytes+(i-startBlock-1)*DefaultConfig().BlockSize : initbytes+(i-startBlock)*DefaultConfig().BlockSize]
+		data = data[initbytes:]
+		for i := startBlock + 1; i < endBlock; i++ {
+			r = data[:DefaultConfig().BlockSize]
+			data = data[DefaultConfig().BlockSize:]
 			p.savecache(fd, int(i), r)
 		}
 		tmp, err = p.readBlock(fd, int(endBlock))
 		if err != nil {
 			return err
 		}
-		r = data[initbytes+(endBlock-startBlock-1)*DefaultConfig().BlockSize:]
-		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
+		if len(tmp) == 0 {
+			tmp = make([]byte, DefaultConfig().BlockSize)
+		}
+		r = data[:len(data)]
+		r = append(r, tmp[len(data):]...)
 		p.savecache(fd, int(endBlock), r)
 	}
 	if offset+uint64(len(data)) > p.info[fd].Inode.Size {
 		p.info[fd].Inode.Size = offset + uint64(len(data))
 	}
+	// return fmt.Errorf("%v", len(info.Modified))
 	return nil
 }
 
@@ -595,6 +604,9 @@ func (p *puddleStoreClient) connectRemote() (*tapestry.Client, error) {
 	err := fmt.Errorf("")
 	for i := 0; i < 5; i += 1 {
 		rand.Seed(time.Now().UnixNano())
+		if len(p.children) == 0 {
+			return nil, fmt.Errorf("no child")
+		}
 		path := "/tapestry/" + p.children[rand.Intn(len(p.children))]
 		addr, _, err := p.Conn.Get(path)
 		if err != nil {
