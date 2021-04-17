@@ -423,6 +423,9 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
 		p.savecache(fd, int(endBlock), r)
 	}
+	if offset+uint64(len(data)) > p.info[fd].Inode.Size {
+		p.info[fd].Inode.Size = offset + uint64(len(data))
+	}
 	return nil
 }
 
