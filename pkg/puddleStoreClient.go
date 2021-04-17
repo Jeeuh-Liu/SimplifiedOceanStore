@@ -218,6 +218,29 @@ func (p *puddleStoreClient) Close(fd int) error {
 		// p.ClientMtx.Unlock()
 		return nil
 	}
+	remotes, err := p.connectRemotes()
+	if err != nil {
+		return fmt.Errorf("connectRemotes, %v", err)
+	}
+	count := 0
+	//mtx
+	for key, data := range p.cache[fd] {
+		if _, ok := p.info[fd].Modified[key]; ok {
+			for _, remote := range remotes {
+				filename := p.info[fd].Inode.Filename
+				saltname := filename + tapestry.RandomID().String()
+				err = remote.Store(saltname, data)
+				if err == nil {
+					p.info[fd].Inode.Blocks[key] = append(p.info[fd].Inode.Blocks[key], saltname)
+					count = count + 1
+				}
+			}
+		}
+	}
+	if count == 0 {
+		return fmt.Errorf("none of publish success")
+	}
+	//mtx
 	// //update metadata in zookeeper, then unlcok
 	if len(info.Modified) != 0 {
 		path := info.Inode.Filename
@@ -238,28 +261,6 @@ func (p *puddleStoreClient) Close(fd int) error {
 			return err
 		}
 	}
-	remotes, err := p.connectRemotes()
-	if err != nil {
-		return fmt.Errorf("connectRemotes, %v", err)
-	}
-	count := 0
-	for key, data := range p.cache[fd] {
-		if _, ok := p.info[fd].Modified[key]; ok {
-			for _, remote := range remotes {
-				filename := p.info[fd].Inode.Filename
-				saltname := filename + tapestry.RandomID().String()
-				err = remote.Store(saltname, data)
-				if err == nil {
-					p.info[0].Inode.Blocks[key] = append(p.info[fd].Inode.Blocks[key], saltname)
-					count = count + 1
-				}
-			}
-		}
-	}
-	if count == 0 {
-		return fmt.Errorf("none of publish success")
-	}
-
 	// //clear fd
 	// p.ClientMtx.Lock()
 	delete(p.info, fd)
