@@ -69,11 +69,11 @@ func TestReadWrite(t *testing.T) {
 	if err := writeFile(client, "/a", 0, []byte(in)); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Second)
 	var out []byte
 	if out, err = readFile(client, "/a", 0, 5); err != nil {
 		t.Fatal(err)
 	}
+	t.Errorf("%v, %v", len(string(out)), err)
 
 	if in != string(out) {
 		t.Fatalf("Expected: %v %v, Got: %v %v", in, len(in), string(out), len(out))

@@ -365,15 +365,26 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// make sure at least one is published
 	// cache the write
 	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
-	// if info.Inode.Size == 0{
-	// 	for i := 0; i < int(endBlock); i++{
-	// 	}
-	// 	for i := 0; i <= int(endBlock); i++{
-	// 		p.info[fd].Modified[i] = true
-	// 	}
-
-	// 	size += DefaultConfig().BlockSize
-	// }
+	if info.Inode.Size == 0 {
+		var size uint64 = 0
+		for i := 0; i < int(endBlock); i++ {
+			piece := data[:DefaultConfig().BlockSize]
+			data = data[DefaultConfig().BlockSize:]
+			p.savecache(fd, i, piece)
+			size += DefaultConfig().BlockSize
+		}
+		piece := make([]byte, DefaultConfig().BlockSize)
+		for i, v := range data {
+			piece[i] = v
+		}
+		p.savecache(fd, int(endBlock), piece)
+		size = size + uint64(len(data))
+		for i := 0; i <= int(endBlock); i++ {
+			p.info[fd].Modified[i] = true
+		}
+		p.info[fd].Inode.Size += uint64(size)
+		return nil
+	}
 	startBlock := offset / DefaultConfig().BlockSize
 	currentBlock := info.Inode.Size / DefaultConfig().BlockSize
 
@@ -432,7 +443,7 @@ func (p *puddleStoreClient) savecache(fd, numBlock int, data []byte) {
 		p.cache[fd] = make(map[int][]byte)
 	}
 	p.cache[fd][numBlock] = data
-	p.info[fd].Modified[numBlock] = true
+	// p.info[fd].Modified[numBlock] = true
 	// p.ClientMtx.Unock()
 }
 
