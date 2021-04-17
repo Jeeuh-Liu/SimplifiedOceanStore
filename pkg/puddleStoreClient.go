@@ -914,9 +914,11 @@ func (p *puddleStoreClient) Exit() {
 func (p *puddleStoreClient) connectRemote() (*tapestry.Client, error) {
 	//load balancing: It's better to have client gets a random node each time when need to interact.
 	err := fmt.Errorf("")
-	for i := 0; i < 5; i += 1 {
+	for i := 0; i < RETRY; i += 1 {
 		rand.Seed(time.Now().UnixNano())
+		p.ClientMtx.Lock()
 		if len(p.children) == 0 {
+			p.ClientMtx.Unlock()
 			return nil, fmt.Errorf("no child")
 		}
 		path := "/tapestry/" + p.children[rand.Intn(len(p.children))]
@@ -928,8 +930,10 @@ func (p *puddleStoreClient) connectRemote() (*tapestry.Client, error) {
 		if err != nil {
 			continue
 		}
+		p.ClientMtx.Unlock()
 		return remote, err
 	}
+	p.ClientMtx.Unlock()
 	return nil, err
 }
 
@@ -957,9 +961,12 @@ func (p *puddleStoreClient) connectRemote() (*tapestry.Client, error) {
 
 func (p *puddleStoreClient) watch() {
 	children, _, eventChan, _ := p.Conn.ChildrenW("/tapestry")
+	p.ClientMtx.Lock()
 	p.children = children
+	p.ClientMtx.Unlock()
 	for {
 		event := <-eventChan
+		p.ClientMtx.Lock()
 		if event.Type == zk.EventNodeCreated {
 			p.children = append(p.children, event.Path)
 		}
@@ -973,6 +980,7 @@ func (p *puddleStoreClient) watch() {
 				p.children = p.children[:len-1]
 			}
 		}
+		p.ClientMtx.Unlock()
 	}
 }
 
