@@ -412,6 +412,14 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if startBlock == endBlock {
 		tmp, err := p.readBlock(fd, int(startBlock))
 		if err != nil {
+			for i := 0; i < RETRY; i++ {
+				tmp, err = p.readBlock(fd, int(startBlock))
+				if err == nil {
+					break
+				}
+			}
+		}
+		if err != nil {
 			return err
 		}
 		if len(tmp) == 0 {
@@ -423,6 +431,14 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		p.savecache(fd, int(startBlock), r)
 	} else {
 		tmp, err := p.readBlock(fd, int(startBlock))
+		if err != nil {
+			for i := 0; i < RETRY; i++ {
+				tmp, err = p.readBlock(fd, int(startBlock))
+				if err == nil {
+					break
+				}
+			}
+		}
 		if err != nil {
 			return err
 		}
@@ -440,6 +456,14 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 			p.savecache(fd, int(i), r)
 		}
 		tmp, err = p.readBlock(fd, int(endBlock))
+		if err != nil {
+			for i := 0; i < RETRY; i++ {
+				tmp, err = p.readBlock(fd, int(startBlock))
+				if err == nil {
+					break
+				}
+			}
+		}
 		if err != nil {
 			return err
 		}
@@ -522,7 +546,7 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 			}
 			return data, nil
 		}
-		return []byte{}, fmt.Errorf("need to reread")
+		return []byte{}, nil
 	}
 }
 
