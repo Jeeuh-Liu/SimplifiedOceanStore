@@ -271,7 +271,6 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	startBlock := offset / DefaultConfig().BlockSize
 	endBlock := boundary / DefaultConfig().BlockSize
 	offset = offset % DefaultConfig().BlockSize
-	var rlt []byte
 	if startBlock == endBlock {
 		//first read from cache
 		data, err := p.readBlock(fd, int(startBlock))
@@ -284,15 +283,19 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		//cache it
 		return data[offset:(offset + size)], nil
 	}
+	var rlt []byte
 	var bytesRead uint64
 	bytesRead = 0
 	for i := startBlock; i <= endBlock; i++ {
 		//if cached, read locally
-		var data []byte
 		data, err := p.readBlock(fd, int(i))
 		if err != nil {
 			return []byte{}, err
 		}
+		if len(data) == 0 {
+			return []byte{}, fmt.Errorf("unexpected error")
+		}
+		//cache it
 		if i == startBlock {
 			data = data[offset:]
 			bytesRead = bytesRead + uint64(len(data)) - offset
@@ -306,11 +309,9 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 				bytesRead = bytesRead + uint64(len(data))
 			}
 		}
-
 		rlt = append(rlt, data...)
 	}
 	return rlt, nil
-	// return data, err
 }
 
 func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
@@ -340,9 +341,19 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	// for each block, salt DefaultConfig().NumReplicas times and publish it
 	// make sure at least one is published
 	// cache the write
-	startBlock := offset / DefaultConfig().BlockSize
 	endBlock := (offset + uint64(len(data))) / DefaultConfig().BlockSize
+	// if info.Inode.Size == 0{
+	// 	for i := 0; i < int(endBlock); i++{
+	// 	}
+	// 	for i := 0; i <= int(endBlock); i++{
+	// 		p.info[fd].Modified[i] = true
+	// 	}
+
+	// 	size += DefaultConfig().BlockSize
+	// }
+	startBlock := offset / DefaultConfig().BlockSize
 	currentBlock := info.Inode.Size / DefaultConfig().BlockSize
+
 	if offset > info.Inode.Size {
 		// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 		if info.Inode.Size%DefaultConfig().BlockSize == 0 {
@@ -370,6 +381,9 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		if err != nil {
 			return err
 		}
+		if len(tmp) == 0 {
+			tmp = make([]byte, DefaultConfig().BlockSize)
+		}
 		r := tmp[:offset%DefaultConfig().BlockSize]
 		initbytes := DefaultConfig().BlockSize - offset%DefaultConfig().BlockSize
 		r = append(r, data[:initbytes]...)
@@ -386,8 +400,6 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		r = append(r, tmp[(offset+uint64(len(data)))%DefaultConfig().BlockSize:]...)
 		p.savecache(fd, int(endBlock), r)
 	}
-	p.info[fd].Modified[0] = true
-	p.info[fd].Inode.Size = p.info[fd].Inode.Size + 1
 	return nil
 }
 
@@ -409,10 +421,10 @@ func (p *puddleStoreClient) publish(fd, numBlock int, data []byte) error {
 	// p.ClientMtx.Lock()
 	for i, remote := range remotes {
 		filename := p.info[fd].Inode.Filename
-		saltname := filename + fmt.Sprint(i)
+		saltname := filename + tapestry.RandomID().String()
 		err = remote.Store(saltname, data)
 		if err == nil {
-			p.info[0].Inode.Blocks[0] = append(p.info[fd].Inode.Blocks[numBlock], saltname)
+			p.info[fd].Inode.Blocks[fd] = append(p.info[fd].Inode.Blocks[numBlock], saltname)
 			count = count + 1
 		}
 	}
