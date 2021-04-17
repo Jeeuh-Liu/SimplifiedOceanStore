@@ -276,6 +276,7 @@ func (p *puddleStoreClient) Close(fd int) error {
 }
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
+	return []byte{}, fmt.Errorf("%v, %v, %v, %v", fd, offset, size, p.info[fd])
 	//should return a copy of original data array
 	// p.ClientMtx.Lock()
 	info, ok := p.info[fd]
@@ -865,22 +866,27 @@ func (p *puddleStoreClient) Remove(path string) error {
 	if err != nil {
 		return err
 	}
-	node, err := decodeInode(data)
-	if err != nil {
-		return err
-	}
-	if node.IsDir {
-		children, _, err := p.Conn.Children(path)
+	if path != "/tapestry" {
+		node, err := decodeInode(data)
 		if err != nil {
 			return err
 		}
-		for _, s := range children {
-			p.Remove(s)
+		if node.IsDir {
+			children, _, err := p.Conn.Children(path)
+			if err != nil {
+				return err
+			}
+			for _, s := range children {
+				p.Remove(s)
+			}
+			p.Conn.Delete(path, state.Version) //version
+		} else {
+			p.Conn.Delete(path, state.Version)
 		}
-		p.Conn.Delete(path, state.Version) //version
 	} else {
 		p.Conn.Delete(path, state.Version)
 	}
+
 	return nil
 }
 
