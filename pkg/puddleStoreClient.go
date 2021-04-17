@@ -270,18 +270,18 @@ func (p *puddleStoreClient) Close(fd int) error {
 		}
 	}
 	// //clear fd
-	// p.ClientMtx.Lock()
+	p.ClientMtx.Lock()
 	delete(p.info, fd)
-	// p.ClientMtx.Unlock()
+	p.ClientMtx.Unlock()
 	p.unlock()
 	return nil
 }
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	//should return a copy of original data array
-	// p.ClientMtx.Lock()
+	p.ClientMtx.Lock()
 	info, ok := p.info[fd]
-	// p.ClientMtx.Unlock()
+	p.ClientMtx.Unlock()
 	if !ok {
 		return []byte{}, fmt.Errorf("invalid fd")
 	}
