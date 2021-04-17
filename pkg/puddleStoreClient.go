@@ -44,7 +44,7 @@ func (p *puddleStoreClient) init(config Config) {
 
 func (p *puddleStoreClient) getFd() int {
 	// if map FileDescripto does not contain fdCounter, return a copy of fdCounter, and increment fdCounter
-	// p.ClientMtx.Lock()
+	p.ClientMtx.Lock()
 	if _, ok := p.info[p.fdCounter]; !ok {
 		fd := p.fdCounter
 		if fd == math.MaxInt32 {
@@ -52,7 +52,7 @@ func (p *puddleStoreClient) getFd() int {
 		} else {
 			p.fdCounter = p.fdCounter + 1
 		}
-		// p.ClientMtx.Unlock()
+		p.ClientMtx.Unlock()
 		return fd
 	}
 	// otherwise, increment fdCounter until the map does not contain fdCounter, return its copy and increment it
@@ -60,7 +60,7 @@ func (p *puddleStoreClient) getFd() int {
 		if _, ok := p.info[i]; !ok {
 			fd := i
 			p.fdCounter = i + 1
-			// p.ClientMtx.Unlock()
+			p.ClientMtx.Unlock()
 			return fd
 		}
 	}
@@ -68,11 +68,11 @@ func (p *puddleStoreClient) getFd() int {
 		if _, ok := p.info[i]; !ok {
 			fd := i
 			p.fdCounter = i + 1
-			// p.ClientMtx.Unlock()
+			p.ClientMtx.Unlock()
 			return fd
 		}
 	}
-	// p.ClientMtx.Unlock()
+	p.ClientMtx.Unlock()
 	return -1
 }
 
@@ -728,13 +728,13 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 // }
 
 func (p *puddleStoreClient) savecache(fd, numBlock int, data []byte) {
-	// p.ClientMtx.Lock()
+	p.ClientMtx.Lock()
 	if p.cache[fd] == nil {
 		p.cache[fd] = make(map[int][]byte)
 	}
 	p.cache[fd][numBlock] = data
 	p.info[fd].Modified[numBlock] = true
-	// p.ClientMtx.Unock()
+	p.ClientMtx.Unlock()
 }
 
 func (p *puddleStoreClient) publish(fd int) error {
