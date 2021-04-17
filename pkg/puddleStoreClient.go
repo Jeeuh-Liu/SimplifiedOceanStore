@@ -494,13 +494,41 @@ func (p *puddleStoreClient) publish(fd int) error {
 	for numBlock := range p.info[fd].Modified {
 		p.info[fd].Inode.Blocks[numBlock] = make([]string, 0)
 		success := false
+		tapSet := make(map[string]bool)
 		for i := 0; i < p.config.NumReplicas; i++ {
 			p.ClientMtx.Unlock()
 			remote, err := p.connectRemote()
-			p.ClientMtx.Lock()
 			if err != nil {
-				continue
+				for i := 0; i < RETRY; i++ {
+					remote, err = p.connectRemote()
+					if err == nil {
+						break
+					}
+				}
+				if err != nil {
+					return fmt.Errorf("fail publish this time")
+				}
 			}
+			_, ok := tapSet[remote.ID]
+			for i := 0; i < RETRY && ok; i++ {
+				remote, err = p.connectRemote()
+				if err != nil {
+					for i := 0; i < RETRY; i++ {
+						remote, err = p.connectRemote()
+						if err == nil {
+							break
+						}
+					}
+					if err != nil {
+						return fmt.Errorf("fail publish this time")
+					}
+				}
+				_, ok = tapSet[remote.ID]
+			}
+			if !ok {
+				tapSet[remote.ID] = true
+			}
+			p.ClientMtx.Lock()
 			success = true
 			saltname := p.info[fd].Inode.Filename + "-" + strconv.Itoa(numBlock) + "-" + strconv.Itoa(p.getSeq())
 			err = remote.Store(saltname, p.cache[fd][numBlock])
@@ -656,28 +684,6 @@ func (p *puddleStoreClient) connectRemote() (*tapestry.Client, error) {
 	return nil, err
 }
 
-// func (p *puddleStoreClient) connectRemotes() ([]*tapestry.Client, error) {
-// 	//load balancing: It's better to have client gets a random node each time when need to interact.
-// 	//choose  random remote paths from p.children
-
-// 	////retry!!!!!!!
-// 	var remotes []*tapestry.Client
-// 	p.shuffleChildren()
-// 	for i := 0; i < len(p.children) && len(remotes) < p.config.NumReplicas; i++ {
-// 		path := "/tapestry/" + p.children[i]
-// 		addr, _, err := p.Conn.Get(path)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("path name %v, %v", path, err)
-// 		}
-// 		remote, err := tapestry.Connect(string(addr))
-// 		if err == nil {
-// 			remotes = append(remotes, remote)
-// 		}
-// 	}
-// 	// if len(remotes) < p.config.NumReplicas
-// 	return remotes, nil
-// }
-
 func (p *puddleStoreClient) watch() {
 	children, _, eventChan, _ := p.Conn.ChildrenW("/tapestry")
 	p.ClientMtx.Lock()
@@ -702,11 +708,3 @@ func (p *puddleStoreClient) watch() {
 		p.ClientMtx.Unlock()
 	}
 }
-
-// func (p *puddleStoreClient) shuffleChildren() {
-// 	rand.Seed(time.Now().UnixNano())
-// 	for i := len(p.children) - 1; i > 0; i-- {
-// 		j := rand.Intn(i + 1)
-// 		p.children[i], p.children[j] = p.children[j], p.children[i]
-// 	}
-// }
