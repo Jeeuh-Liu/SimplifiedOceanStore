@@ -236,7 +236,7 @@ func (p *puddleStoreClient) Close(fd int) error {
 			//unlcok
 			return fmt.Errorf("unexpected err in zookeeper Exist")
 		}
-		_, err = p.Conn.Set(path, data, state.Version+1)
+		_, err = p.Conn.Set(path, data, state.Version)
 		if err != nil {
 			//unlock
 			return err
@@ -446,7 +446,7 @@ func (p *puddleStoreClient) publish(fd int) error {
 	for i := 0; i < p.config.NumReplicas; i++ {
 		remote, err := p.connectRemote()
 		if err != nil {
-			return fmt.Errorf("connectRemotes, %v", err)
+			continue
 		}
 		// p.ClientMtx.Lock()
 		for numBlock := range p.info[fd].Modified {
