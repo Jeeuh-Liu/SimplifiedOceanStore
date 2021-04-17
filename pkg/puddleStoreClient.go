@@ -276,7 +276,6 @@ func (p *puddleStoreClient) Close(fd int) error {
 }
 
 func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
-	return []byte{}, fmt.Errorf("%v, %v, %v, %v", fd, offset, size, p.info[fd])
 	//should return a copy of original data array
 	// p.ClientMtx.Lock()
 	info, ok := p.info[fd]
