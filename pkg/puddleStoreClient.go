@@ -281,7 +281,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		return []byte{}, nil
 	}
 	if offset > info.Inode.Size {
-		return []byte{}, fmt.Errorf("read herer %v", info.Inode.Size)
+		return []byte{}, nil
 	}
 
 	// data, err := p.readBlock(fd, 0)
