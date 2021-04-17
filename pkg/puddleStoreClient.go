@@ -325,7 +325,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	//should return a copy of original data array and the client should be able to read its own write
 	//if anything fail, should we clear fd?
 	// p.ClientMtx.Lock()
-	return fmt.Errorf("%v", string(data))
+	return fmt.Errorf("%v, %v, %v", len(data), p.config.BlockSize, data)
 	info, ok := p.info[fd]
 	// p.ClientMtx.Unlock()
 	if !ok {
