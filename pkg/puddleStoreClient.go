@@ -44,7 +44,7 @@ func (p *puddleStoreClient) init(config Config) {
 
 func (p *puddleStoreClient) getFd() int {
 	// if map FileDescripto does not contain fdCounter, return a copy of fdCounter, and increment fdCounter
-	p.ClientMtx.Lock()
+	// p.ClientMtx.Lock()
 	if _, ok := p.info[p.fdCounter]; !ok {
 		fd := p.fdCounter
 		if fd == math.MaxInt32 {
@@ -52,7 +52,7 @@ func (p *puddleStoreClient) getFd() int {
 		} else {
 			p.fdCounter = p.fdCounter + 1
 		}
-		p.ClientMtx.Unlock()
+		// p.ClientMtx.Unlock()
 		return fd
 	}
 	// otherwise, increment fdCounter until the map does not contain fdCounter, return its copy and increment it
@@ -60,7 +60,7 @@ func (p *puddleStoreClient) getFd() int {
 		if _, ok := p.info[i]; !ok {
 			fd := i
 			p.fdCounter = i + 1
-			p.ClientMtx.Unlock()
+			// p.ClientMtx.Unlock()
 			return fd
 		}
 	}
@@ -68,11 +68,11 @@ func (p *puddleStoreClient) getFd() int {
 		if _, ok := p.info[i]; !ok {
 			fd := i
 			p.fdCounter = i + 1
-			p.ClientMtx.Unlock()
+			// p.ClientMtx.Unlock()
 			return fd
 		}
 	}
-	p.ClientMtx.Unlock()
+	// p.ClientMtx.Unlock()
 	return -1
 }
 
@@ -111,7 +111,7 @@ func (p *puddleStoreClient) unlock() {
 }
 
 func (p *puddleStoreClient) isFileExist(path string) (bool, error) {
-	//lock()
+	// lock()
 	rlt, _, err := p.Conn.Exists(path)
 	//unlock()
 	if err != nil {
@@ -152,12 +152,12 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 				return fd, err
 			}
 			//may change the flag
-			//lock
+			p.lock()
 			acl := zk.WorldACL(zk.PermAll)
 			_, err = p.Conn.Create(path, data, 0, acl)
 			//Creating file without existing directory should throw an error
 			if err != nil {
-				//unlock
+				p.unlock()
 				return fd, err
 			}
 			fd = p.getFd()
@@ -171,15 +171,15 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 			return fd, nil
 		}
 	}
-	//lock
+	p.lock()
 	data, _, err := p.Conn.Get(path)
 	if err != nil {
-		//unlock
+		p.unlock()
 		return fd, err
 	}
 	node, err := decodeInode(data)
 	if err != nil {
-		//unlock
+		p.unlock()
 		return fd, err
 	}
 	if node.IsDir {
@@ -202,9 +202,9 @@ func (p *puddleStoreClient) underFile(path string) (bool, error) {
 	if len(dir) == 1 && dir[0] == 47 {
 		return false, nil
 	}
-	//lock()
+	p.lock()
 	data, _, err := p.Conn.Get(dir)
-	//unlock()
+	p.unlock()
 	if err != nil {
 		return false, fmt.Errorf("zk err, %v", err)
 	}
@@ -230,7 +230,7 @@ func (p *puddleStoreClient) Close(fd int) error {
 	}
 	//if flush is not needed unlock and return nil
 	if !info.Flush {
-		//unlock
+		p.unlock()
 		// p.ClientMtx.Lock()
 		delete(p.info, fd)
 		// p.ClientMtx.Unlock()
@@ -247,6 +247,7 @@ func (p *puddleStoreClient) Close(fd int) error {
 				}
 			}
 			if err != nil {
+				p.unlock()
 				return fmt.Errorf("publish fail")
 			}
 		}
@@ -254,17 +255,17 @@ func (p *puddleStoreClient) Close(fd int) error {
 		//it should be inode here
 		data, err := encodeInode(*info.Inode)
 		if err != nil {
-			//unlock
+			p.unlock()
 			return fmt.Errorf("err in enode inode")
 		}
 		_, state, err := p.Conn.Exists(path)
 		if err != nil {
-			//unlcok
+			p.unlock()
 			return fmt.Errorf("unexpected err in zookeeper Exist")
 		}
 		_, err = p.Conn.Set(path, data, state.Version)
 		if err != nil {
-			//unlock
+			p.unlock()
 			return err
 		}
 	}
@@ -272,6 +273,7 @@ func (p *puddleStoreClient) Close(fd int) error {
 	// p.ClientMtx.Lock()
 	delete(p.info, fd)
 	// p.ClientMtx.Unlock()
+	p.unlock()
 	return nil
 }
 
@@ -469,7 +471,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	if len(data) == 0 {
 		return nil
 	}
-	// err := p.publish(fd, 0, data)
+	//	 err := p.publish(fd, 0, data)
 	// if err != nil {
 	// 	return fmt.Errorf("problem in publish %v", err)
 	// }
