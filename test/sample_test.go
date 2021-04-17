@@ -114,30 +114,31 @@ func TestWriteEmptyWithOffset(t *testing.T) {
 
 	in := "muddle"
 
-	// for i := 0; i < 58; i++ {
-	// 	if err := writeFile(client, "/a", uint64(i), []byte(in)); err != nil {
-	// 		t.Fatal(err)
-	// 	}
-	// 	var out []byte
-	// 	if out, err = readFile(client, "/a", uint64(i), uint64(i+6)); err != nil {
-	// 		t.Fatal(err)
-	// 	}
-	// 	if in != string(out) {
-	// 		t.Fatalf("at %v iter, Expected: %v %v, Got: %v %v", i, []byte(in), len(in), out, len(out))
-	// 	}
+	for i := 0; i < 200; i++ {
+		if err := writeFile(client, "/a", uint64(i), []byte(in)); err != nil {
+			t.Fatal(err)
+		}
+		var out []byte
+		if out, err = readFile(client, "/a", uint64(i), 6); err != nil {
+			t.Fatal(err)
+		}
+		if in != string(out) {
+			t.Fatalf("at %v iter, Expected: %v %v, Got: %v %v", i, []byte(in), len(in), out, len(out))
+		}
+	}
+	// i := 58
+	// if err = writeFile(client, "/a", uint64(i), []byte(in)); err != nil {
+	// 	t.Fatal(err)
 	// }
-	i := 58
-	if err = writeFile(client, "/a", uint64(i), []byte(in)); err != nil {
-		t.Fatal(err)
-	}
-	out, err := readFile(client, "/a", uint64(i), uint64(i+6))
-	if err != nil {
-		t.Fatalf("%v %v", []byte(in), out)
-	}
-	if in != string(out) {
-		t.Fatalf("at 1 iter, Expected: %v %v, Got: %v %v", []byte(in), len(in), out, len(out))
-	}
-
+	// out, err := readFile(client, "/a", uint64(i), 6)
+	// if err != nil {
+	// 	t.Fatalf("%v %v", []byte(in), err)
+	// }
+	// if in != string(out) {
+	// 	t.Fatalf("at %v iter, Expected: %v %v, Got: %v %v", i, []byte(in), len(in), out, len(out))
+	// }
+	// client.Remove("/tapestry")
+	// client.Remove("/a")
 }
 func TestClient(t *testing.T) {
 	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
