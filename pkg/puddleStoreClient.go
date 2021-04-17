@@ -226,8 +226,16 @@ func (p *puddleStoreClient) Close(fd int) error {
 	// //update metadata in zookeeper, then unlcok
 	if len(info.Modified) != 0 {
 		err := p.publish(fd)
-		for err != nil {
-			err = p.publish(fd)
+		if err != nil {
+			for i := 0; i < RETRY; i++ {
+				err = p.publish(fd)
+				if err == nil {
+					break
+				}
+			}
+			if err != nil {
+				return fmt.Errorf("publish fail")
+			}
 		}
 		path := info.Inode.Filename
 		//it should be inode here
