@@ -171,8 +171,9 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 	// p.ClientMtx.Lock()
 	fd = p.getFd()
 	p.info[fd] = fileInfo{
-		Flush: write,
-		Inode: node,
+		Flush:    write,
+		Inode:    node,
+		Modified: make(map[int]bool),
 	}
 	// p.ClientMtx.Unlock()
 	return fd, nil
