@@ -32,3 +32,71 @@ You can also follow manual instructions for installing Zookeeper directly on you
 ### Some expectations for using this README
 
 Write your student tests, document them here!
+
+Distribution: Zhengyan Lyu: PuddleStore Client, Tests
+
+Zongjie Liu: PuddleStore Client, Tests
+
+Extra Feature: ACL
+
+Bug: Even Distribution kill failed
+
+Tests:
+
+TestReadEmptyFile: Test reading empty files
+
+TestReadWrite: Test read and write
+
+TestWriteAcrossBlock: Test write across block
+
+TestReadAcrossBlock: Test read across block
+
+TestReadBeyondFileSize: Test Read Beyond File Size
+
+TestClient: Test client
+
+TestTwoClient: Test two clients
+
+TestCreateUnderRoot: Test Create Under Root
+
+TestReadNonexistFile: Test Read Nonexist File
+
+TestNormalClose1: Test close
+
+TestNormalClose2: Test close2
+
+TestReadClosedFile: Test Read Closed File
+
+TestRemove: Test Remove
+
+TestWatch: Test watch
+
+TestCreateRoot: Test create root
+
+TestOpenNonExistWithoutCreate: Test Open NonExist path Without Create
+
+TestWriteEmptyWithOffset: Test Write Empty With Offset
+
+TestReadWrite2: Test read and write
+
+TestList: Test List with mkdir and remove
+
+TestList2: Test List with mkdir
+
+TestRemove2: Test remove
+
+TestMkdir2: Test make dir
+
+TestMkRoot: test make root dir
+
+TestReadBeyondEmpty: test read beyond empty
+
+TestWriteEdges: test write edges
+
+TestMkdir3: Test make dir
+
+TestReadOthersFile: Test read other file
+
+TestOpenSameFile: test two client read same file
+
+TestConWrite: test write concurrently
