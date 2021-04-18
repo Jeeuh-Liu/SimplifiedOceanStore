@@ -37,7 +37,7 @@ func TestReadEmptyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path := "/a"
+	path := "/la1"
 
 	fd, err := client.Open(path, true, true)
 	if err != nil {
@@ -49,7 +49,7 @@ func TestReadEmptyFile(t *testing.T) {
 	}
 	client.Close(fd)
 
-	err = client.Remove("/a")
+	err = client.Remove("/la1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,18 +75,18 @@ func TestReadWrite(t *testing.T) {
 
 	in := "testtesttesttesttesttesttesttesttesttesttesttest"
 
-	if err := writeFile(client, "/a", 0, []byte(in)); err != nil {
+	if err := writeFile(client, "/la2", 0, []byte(in)); err != nil {
 		t.Fatal(err)
 	}
 	var out []byte
-	if out, err = readFile(client, "/a", 0, 48); err != nil {
+	if out, err = readFile(client, "/la2", 0, 48); err != nil {
 		t.Fatal(err)
 	}
 	if in != string(out) {
 		t.Fatalf("Expected: %v %v, Got: %v %v", in, len(in), string(out), len(out))
 	}
 
-	err = client.Remove("/a")
+	err = client.Remove("/la2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,11 +106,11 @@ func TestWriteAcrossBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = writeFile(client1, "/a", 0, in)
+	err = writeFile(client1, "/la3", 0, in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client1.Remove("/a")
+	client1.Remove("/la3")
 	client1.Exit()
 }
 
@@ -128,19 +128,19 @@ func TestReadAcrossBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = writeFile(client1, "/a", 0, in)
+	err = writeFile(client1, "/la4", 0, in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := readFile(client1, "/a", 0, uint64(len(in)))
+	out, err := readFile(client1, "/la4", 0, uint64(len(in)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(in) != string(out) {
-		client1.Remove("/a")
+		client1.Remove("/la4")
 		t.Fatalf("Expected: %v %v, Got: %v %v", in, len(in), string(out), len(out))
 	}
-	client1.Remove("/a")
+	client1.Remove("/la4")
 	client1.Exit()
 }
 
@@ -158,18 +158,18 @@ func TestReadBeyondFileSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = writeFile(client1, "/a", 0, in)
+	err = writeFile(client1, "/la5", 0, in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := readFile(client1, "/a", 0, uint64(1000))
+	out, err := readFile(client1, "/la5", 0, uint64(1000))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(in) != string(out) {
 		t.Fatalf("Expected: %v %v, Got: %v %v", in, len(in), string(out), len(out))
 	}
-	client1.Remove("/a")
+	client1.Remove("/la5")
 	client1.Exit()
 }
 
@@ -215,12 +215,12 @@ func TestCreateUnderRoot(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v, %v", client, err)
 	}
-	fd, err := client.Open("/a.txt", true, false)
+	fd, err := client.Open("/la6", true, false)
 	if err != nil || fd < 0 {
 		t.Errorf("%v, %v", fd, err)
 	}
 	client.Close(fd)
-	err = client.Remove("/a.txt")
+	err = client.Remove("/la6")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestNormalClose1(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v, %v", client, err)
 	}
-	fd, err := client.Open("/b.txt", true, false)
+	fd, err := client.Open("/la7", true, false)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -264,7 +264,7 @@ func TestNormalClose1(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	err = client.Remove("/b.txt")
+	err = client.Remove("/la7")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestNormalClose2(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v, %v", client, err)
 	}
-	fd, err := client.Open("/b.txt", true, true)
+	fd, err := client.Open("/la8", true, true)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -289,7 +289,7 @@ func TestNormalClose2(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	err = client.Remove("/b.txt")
+	err = client.Remove("/la8")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func TestReadClosedFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v, %v", client, err)
 	}
-	fd, err := client.Open("/b.txt", true, false)
+	fd, err := client.Open("/la9", true, false)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -317,7 +317,7 @@ func TestReadClosedFile(t *testing.T) {
 	if err == nil {
 		t.Errorf("the fd is invalid")
 	}
-	err = client.Remove("/b.txt")
+	err = client.Remove("/la9")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,11 +336,11 @@ func TestRemove(t *testing.T) {
 
 	in := "muddle"
 
-	if err := writeFile(client, "/a", 0, []byte(in)); err != nil {
+	if err := writeFile(client, "/la10", 0, []byte(in)); err != nil {
 		t.Fatal(err)
 	}
 	cluster.Shutdown()
-	err = client.Remove("/a")
+	err = client.Remove("/la10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,11 +405,11 @@ func TestWriteEmptyWithOffset(t *testing.T) {
 	in := "muddle"
 
 	for i := 58; i < 63; i++ {
-		if err := writeFile(client, "/a", uint64(i), []byte(in)); err != nil {
+		if err := writeFile(client, "/la12", uint64(i), []byte(in)); err != nil {
 			t.Errorf("%v", err)
 		}
 		var out []byte
-		if out, err = readFile(client, "/a", uint64(i), 6); err != nil {
+		if out, err = readFile(client, "/la12", uint64(i), 6); err != nil {
 			t.Errorf("%v", err)
 		}
 		if in != string(out) {
@@ -417,7 +417,7 @@ func TestWriteEmptyWithOffset(t *testing.T) {
 		}
 	}
 
-	err = client.Remove("/a")
+	err = client.Remove("/la12")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,51 +468,21 @@ func TestReadWrite2(t *testing.T) {
 
 	in := "test"
 
-	if err := writeFile(client, "/a", 4, []byte(in)); err != nil {
+	if err := writeFile(client, "/la13", 4, []byte(in)); err != nil {
 		t.Fatal(err)
 	}
 	var out []byte
-	if out, err = readFile(client, "/a", 4, 4); err != nil {
+	if out, err = readFile(client, "/la13", 4, 4); err != nil {
 		t.Fatal(err)
 	}
 	if in != string(out) {
 		t.Fatalf("Expected: %v %v, Got: %v %v", in, len(in), string(out), len(out))
 	}
 
-	err = client.Remove("/a")
+	err = client.Remove("/la13")
 	if err != nil {
 		t.Fatal(err)
 	}
-}
-
-func TestOpenSameFile(t *testing.T) {
-	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cluster.Shutdown()
-	client, err := cluster.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	client2, err := cluster.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := "/a"
-
-	fd, err := client.Open(path, true, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fd2, err := client2.Open(path, false, true)
-	if err == nil {
-		t.Fatal("two files opend")
-	}
-	err = client.Remove("/a")
-	client.Close(fd)
-	client2.Close(fd2)
-	client.Remove(path)
 }
 
 func TestList(t *testing.T) {
@@ -529,8 +499,8 @@ func TestList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client.Mkdir("/b")
-	path := "/b/a"
+	client.Mkdir("/la16")
+	path := "/la16/a"
 	fd, err := client.Open(path, true, true)
 	if err != nil {
 		t.Fatal(err)
@@ -540,44 +510,17 @@ func TestList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = client.Remove("/b/a")
+	err = client.Remove("/la16/a")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = client.Remove("/b")
+	err = client.Remove("/la16")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client.Close(fd)
-}
-
-func TestConWrite(t *testing.T) {
-	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer cluster.Shutdown()
-	client, err := cluster.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	in := "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest"
-
-	go func(client puddlestore.Client) {
-		in := "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest"
-		writeFile(client, "/a", 0, []byte(in))
-	}(client)
-	time.Sleep(time.Second)
-	if err := writeFile(client, "/a", 0, []byte(in)); err != nil {
-		client.Remove("/a")
-		t.Fatal(err)
-	}
-	client.Remove("/a")
-	client.Exit()
 }
 
 func TestList2(t *testing.T) {
@@ -612,7 +555,7 @@ func TestRemove2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = client.Remove("/ta")
+	err = client.Remove("/ta100")
 	if err == nil {
 		t.Errorf("list nonexist path")
 	}
@@ -633,6 +576,8 @@ func TestMkdir2(t *testing.T) {
 	if err != nil {
 		t.Errorf("should mkdir for /a/ based on checkpoint")
 	}
+	client.Remove("/a/")
+	client.Remove("/a")
 }
 
 func TestMkRoot(t *testing.T) {
@@ -663,7 +608,7 @@ func TestReadBeyondEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fd, err := client.Open("/a", true, true)
+	fd, err := client.Open("/la20", true, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -672,7 +617,7 @@ func TestReadBeyondEmpty(t *testing.T) {
 		t.Errorf("WRONG OUTPUT FOR READ BEYOND EMPTY")
 	}
 	client.Close(fd)
-	client.Remove("/a")
+	client.Remove("/la20")
 }
 
 func TestWriteEdges(t *testing.T) {
@@ -690,7 +635,7 @@ func TestWriteEdges(t *testing.T) {
 	if err == nil {
 		t.Errorf("this fd is invalid")
 	}
-	fd, err := client.Open("/a", true, false)
+	fd, err := client.Open("/la21", true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -699,12 +644,93 @@ func TestWriteEdges(t *testing.T) {
 		t.Errorf("this is readonly file")
 	}
 	client.Close(fd)
-	fd, err = client.Open("/c.txt", true, false)
+	fd, err = client.Open("/la22", true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	client.Close(fd)
-	client.Remove("/a")
-	client.Remove("/c.txt")
+	client.Remove("/la21")
+	client.Remove("/la22")
 	client.Exit()
+}
+
+func TestOpenSameFile(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client2, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/success"
+
+	fd, err := client.Open(path, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fd2, err := client2.Open(path, false, true)
+	if err == nil {
+		client.Remove("/success")
+		t.Fatal("two files opend")
+	}
+	client.Remove("/success")
+	client.Close(fd)
+	client2.Close(fd2)
+	client.Remove(path)
+}
+
+func TestConWrite(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	in := "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest"
+
+	go func(client puddlestore.Client) {
+		in := "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest"
+		writeFile(client, "/la17", 0, []byte(in))
+	}(client)
+	time.Sleep(time.Second)
+	if err := writeFile(client, "/la17", 0, []byte(in)); err != nil {
+		client.Remove("/la17")
+		t.Fatal(err)
+	}
+	client.Remove("/la17")
+	client.Exit()
+}
+
+func TestMkdir3(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Mkdir("/p3")
+	client.Mkdir("/p3/lu")
+	client.Mkdir("/p3/tk")
+	client.Mkdir("/p3/tk/a3")
+	client.Remove("/p3/tk")
+	list, _ := client.List("/p3")
+	client.Remove("/p3/tk/a3")
+	client.Remove("/p3/tk")
+	client.Remove("/p3/lu")
+	client.Remove("/p3")
+	t.Errorf("%v", list)
 }
