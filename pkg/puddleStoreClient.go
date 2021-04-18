@@ -519,18 +519,18 @@ func (p *puddleStoreClient) publish(fd int) error {
 	return nil
 }
 
-func (p *puddleStoreClient) readBlockTry(fd, numBlock int) ([]byte, error) {
-	tmp, err := p.readBlock(fd, int(numBlock))
-	if err != nil {
-		for i := 0; i < RETRY; i++ {
-			tmp, err = p.readBlock(fd, int(numBlock))
-			if err == nil {
-				break
-			}
-		}
-	}
-	return tmp, err
-}
+// func (p *puddleStoreClient) readBlockTry(fd, numBlock int) ([]byte, error) {
+// 	tmp, err := p.readBlock(fd, int(numBlock))
+// 	if err != nil {
+// 		for i := 0; i < RETRY; i++ {
+// 			tmp, err = p.readBlock(fd, int(numBlock))
+// 			if err == nil {
+// 				break
+// 			}
+// 		}
+// 	}
+// 	return tmp, err
+// }
 
 func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 	p.ClientMtx.Lock()
@@ -557,6 +557,13 @@ func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 			if err != nil {
 				continue
 			}
+			p.ClientMtx.Lock()
+			filename := p.info[fd].Inode.Filename
+			if p.cache[filename] == nil {
+				p.cache[filename] = make(map[int][]byte)
+			}
+			p.cache[filename][numBlock] = data
+			p.ClientMtx.Unlock()
 			return data, nil
 		}
 		return []byte{}, nil
