@@ -645,3 +645,26 @@ func TestMkRoot(t *testing.T) {
 		t.Errorf("should mk root")
 	}
 }
+
+func TestReadBeyondEmpty(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fd, err := client.Open("/a", true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := client.Read(fd, 100, 100)
+	if len(out) != 0 || err != nil {
+		t.Errorf("WRONG OUTPUT FOR READ BEYOND EMPTY")
+	}
+	client.Close(fd)
+	client.Remove("/a")
+}
