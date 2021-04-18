@@ -732,5 +732,7 @@ func TestMkdir3(t *testing.T) {
 	client.Remove("/p3/tk")
 	client.Remove("/p3/lu")
 	client.Remove("/p3")
-	t.Errorf("%v", list)
+	if len(list) != 0 && list[0] != "lu" {
+		t.Errorf("fail to delete recursive")
+	}
 }

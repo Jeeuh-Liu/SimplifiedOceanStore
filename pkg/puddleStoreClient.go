@@ -596,7 +596,7 @@ func (p *puddleStoreClient) Remove(path string) error {
 				return err
 			}
 			for _, s := range children {
-				p.Remove(s)
+				p.Remove(filepath.Join(path, s))
 			}
 			p.Conn.Delete(path, state.Version) //version
 		} else {
@@ -715,4 +715,17 @@ func (p *puddleStoreClient) connectRemotes() ([]*tapestry.Client, error) {
 		}
 	}
 	return remotes, nil
+}
+
+func (p *puddleStoreClient) readBlockTry(fd, numBlock int) ([]byte, error) {
+	tmp, err := p.readBlock(fd, int(numBlock))
+	if err != nil {
+		for i := 0; i < RETRY; i++ {
+			tmp, err = p.readBlock(fd, int(numBlock))
+			if err == nil {
+				break
+			}
+		}
+	}
+	return tmp, err
 }
