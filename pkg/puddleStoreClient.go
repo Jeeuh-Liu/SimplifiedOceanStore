@@ -762,6 +762,7 @@ func (p *puddleStoreClient) Chmod(path string, ACL string) error {
 	return nil
 }
 
-func (p *puddleStoreClient) Login(UserID string) {
+func (p *puddleStoreClient) Login(UserID string) error {
 	p.UserID = UserID
+	return nil
 }
