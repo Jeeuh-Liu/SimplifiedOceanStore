@@ -338,7 +338,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		data, err := p.readBlock(fd, int(i))
 		if len(data) == 0 || err != nil {
 			for i := 0; i < RETRY; i++ {
-				data, err = p.readBlock(fd, int(startBlock))
+				data, err = p.readBlock(fd, int(i))
 				if err == nil && len(data) != 0 {
 					break
 				}
@@ -517,6 +517,19 @@ func (p *puddleStoreClient) publish(fd int) error {
 	}
 	p.ClientMtx.Unlock()
 	return nil
+}
+
+func (p *puddleStoreClient) readBlockTry(fd, numBlock int) ([]byte, error) {
+	tmp, err := p.readBlock(fd, int(numBlock))
+	if err != nil {
+		for i := 0; i < RETRY; i++ {
+			tmp, err = p.readBlock(fd, int(numBlock))
+			if err == nil {
+				break
+			}
+		}
+	}
+	return tmp, err
 }
 
 func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {

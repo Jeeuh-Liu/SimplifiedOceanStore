@@ -505,10 +505,11 @@ func TestOpenSameFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fd2, err := client2.Open(path, true, true)
+	fd2, err := client2.Open(path, false, true)
 	if err == nil {
 		t.Fatal("two files opend")
 	}
+	err = client.Remove("/a")
 	client.Close(fd)
 	client2.Close(fd2)
 	client.Remove(path)
