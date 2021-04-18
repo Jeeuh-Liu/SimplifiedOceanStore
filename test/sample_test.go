@@ -594,3 +594,54 @@ func TestList2(t *testing.T) {
 		t.Errorf("list nonexist path")
 	}
 }
+
+func TestRemove2(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Remove("/ta")
+	if err == nil {
+		t.Errorf("list nonexist path")
+	}
+}
+
+func TestMkdir2(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Mkdir("/a/")
+	if err != nil {
+		t.Errorf("should mkdir for /a/ based on checkpoint")
+	}
+}
+
+func TestMkRoot(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Mkdir("/")
+	if err == nil {
+		t.Errorf("should mk root")
+	}
+}
