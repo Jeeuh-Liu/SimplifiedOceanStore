@@ -294,7 +294,6 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		return []byte{}, nil
 	}
 
-	// data, err := p.readBlock(fd, 0)
 	//calculate the blocks we need to read
 	boundary := info.Inode.Size
 	if offset+size <= boundary {
@@ -311,17 +310,9 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	offsetFirstBlock := offset % p.config.BlockSize
 	if startBlock == endBlock {
 		//first read from cache
-		data, err := p.readBlock(fd, int(startBlock))
-		if len(data) == 0 || err != nil {
-			for i := 0; i < RETRY; i++ {
-				data, err = p.readBlock(fd, int(startBlock))
-				if err == nil && len(data) != 0 {
-					break
-				}
-			}
-			if err != nil || len(data) != 0 {
-				return []byte{}, err
-			}
+		data, err := p.readBlockTry(fd, int(startBlock))
+		if err != nil || len(data) != 0 {
+			return []byte{}, err
 		}
 		rlt := data[offsetFirstBlock:(offsetFirstBlock + size)]
 		// return nil, fmt.Errorf("%v", rlt)
@@ -335,17 +326,9 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 	bytesRead = 0
 	for i := startBlock; i <= endBlock; i++ {
 		//if cached, read locally
-		data, err := p.readBlock(fd, int(i))
-		if len(data) == 0 || err != nil {
-			for i := 0; i < RETRY; i++ {
-				data, err = p.readBlock(fd, int(startBlock))
-				if err == nil && len(data) != 0 {
-					break
-				}
-			}
-			if err != nil || len(data) != 0 {
-				return []byte{}, err
-			}
+		data, err := p.readBlockTry(fd, int(i))
+		if err != nil || len(data) != 0 {
+			return []byte{}, err
 		}
 		//cache it
 		if i == startBlock {
@@ -407,15 +390,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		}
 	}
 	if startBlock == endBlock {
-		tmp, err := p.readBlock(fd, int(startBlock))
-		if err != nil {
-			for i := 0; i < RETRY; i++ {
-				tmp, err = p.readBlock(fd, int(startBlock))
-				if err == nil {
-					break
-				}
-			}
-		}
+		tmp, err := p.readBlockTry(fd, int(startBlock))
 		if err != nil {
 			return err
 		}
@@ -427,15 +402,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		r = append(r, tmp[(offset+uint64(len(data)))%p.config.BlockSize:]...)
 		p.savecache(fd, int(startBlock), r)
 	} else {
-		tmp, err := p.readBlock(fd, int(startBlock))
-		if err != nil {
-			for i := 0; i < RETRY; i++ {
-				tmp, err = p.readBlock(fd, int(startBlock))
-				if err == nil {
-					break
-				}
-			}
-		}
+		tmp, err := p.readBlockTry(fd, int(startBlock))
 		if err != nil {
 			return err
 		}
@@ -452,15 +419,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 			data = data[p.config.BlockSize:]
 			p.savecache(fd, int(i), r)
 		}
-		tmp, err = p.readBlock(fd, int(endBlock))
-		if err != nil {
-			for i := 0; i < RETRY; i++ {
-				tmp, err = p.readBlock(fd, int(startBlock))
-				if err == nil {
-					break
-				}
-			}
-		}
+		tmp, err = p.readBlockTry(fd, int(endBlock))
 		if err != nil {
 			return err
 		}
@@ -517,6 +476,21 @@ func (p *puddleStoreClient) publish(fd int) error {
 	return nil
 }
 
+func (p *puddleStoreClient) readBlockTry(fd, numBlock int) ([]byte, error) {
+	tmp, err := p.readBlock(fd, int(numBlock))
+	if err != nil {
+		for i := 0; i < RETRY; i++ {
+			tmp, err = p.readBlock(fd, int(numBlock))
+			if err == nil {
+				break
+			}
+		}
+	}
+	if err != nil {
+		return tmp, err
+	}
+	return tmp, nil
+}
 func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 	p.ClientMtx.Lock()
 	data, ok := p.cache[fd][numBlock]
