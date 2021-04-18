@@ -238,18 +238,17 @@ func (p *puddleStoreClient) Close(fd int) error {
 	}
 	// //update metadata in zookeeper, then unlcok
 	if len(info.Modified) != 0 {
-		err := p.publish(fd)
+		var err error
+		for i := 0; i < RETRY; i++ {
+			err = p.publish(fd)
+			if err == nil {
+				break
+			}
+		}
 		if err != nil {
-			for i := 0; i < RETRY; i++ {
-				err = p.publish(fd)
-				if err == nil {
-					break
-				}
-			}
-			if err != nil {
-				p.unlock()
-				return fmt.Errorf("publish fail")
-			}
+			p.unlock()
+			return fmt.Errorf("publish fail")
+
 		}
 		path := info.Inode.Filename
 		//it should be inode here
@@ -343,9 +342,10 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 					break
 				}
 			}
-			if err != nil || len(data) != 0 {
-				return []byte{}, err
-			}
+
+		}
+		if err != nil || len(data) == 0 {
+			return []byte{}, err
 		}
 		//cache it
 		if i == startBlock {
