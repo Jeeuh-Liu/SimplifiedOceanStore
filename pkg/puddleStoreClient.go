@@ -56,22 +56,22 @@ func (p *puddleStoreClient) getFd() int {
 		return fd
 	}
 	// otherwise, increment fdCounter until the map does not contain fdCounter, return its copy and increment it
-	for i := p.fdCounter + 1; i < math.MaxInt32; i++ {
-		if _, ok := p.info[i]; !ok {
-			fd := i
-			p.fdCounter = i + 1
-			p.ClientMtx.Unlock()
-			return fd
-		}
-	}
-	for i := 0; i < p.fdCounter; i++ {
-		if _, ok := p.info[i]; !ok {
-			fd := i
-			p.fdCounter = i + 1
-			p.ClientMtx.Unlock()
-			return fd
-		}
-	}
+	// for i := p.fdCounter + 1; i < math.MaxInt32; i++ {
+	// 	if _, ok := p.info[i]; !ok {
+	// 		fd := i
+	// 		p.fdCounter = i + 1
+	// 		p.ClientMtx.Unlock()
+	// 		return fd
+	// 	}
+	// }
+	// for i := 0; i < p.fdCounter; i++ {
+	// 	if _, ok := p.info[i]; !ok {
+	// 		fd := i
+	// 		p.fdCounter = i + 1
+	// 		p.ClientMtx.Unlock()
+	// 		return fd
+	// 	}
+	// }
 	p.ClientMtx.Unlock()
 	return -1
 }
