@@ -25,8 +25,8 @@ type fileInfo struct {
 
 type puddleStoreClient struct {
 	Conn      *zk.Conn
-	ClientMtx sync.Mutex             // Mutex for concurrent access to Client
-	cache     map[int]map[int][]byte //maintain a map from block num -> bytes or tapestry ID() TODO
+	ClientMtx sync.Mutex                // Mutex for concurrent access to Client
+	cache     map[string]map[int][]byte //maintain a map from block num -> bytes or tapestry ID() TODO
 	fdCounter int
 	info      map[int]fileInfo //fd -> fileinfo
 	children  []string
@@ -35,7 +35,7 @@ type puddleStoreClient struct {
 }
 
 func (p *puddleStoreClient) init(config Config) {
-	p.cache = make(map[int]map[int][]byte)
+	p.cache = make(map[string]map[int][]byte)
 	p.fdCounter = 0
 	p.info = make(map[int]fileInfo)
 	p.children = make([]string, 0)
@@ -481,10 +481,11 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 
 func (p *puddleStoreClient) savecache(fd, numBlock int, data []byte) {
 	p.ClientMtx.Lock()
-	if p.cache[fd] == nil {
-		p.cache[fd] = make(map[int][]byte)
+	filename := p.info[fd].Inode.Filename
+	if p.cache[filename] == nil {
+		p.cache[filename] = make(map[int][]byte)
 	}
-	p.cache[fd][numBlock] = data
+	p.cache[filename][numBlock] = data
 	p.info[fd].Modified[numBlock] = true
 	p.ClientMtx.Unlock()
 }
@@ -502,8 +503,9 @@ func (p *puddleStoreClient) publish(fd int) error {
 		p.ClientMtx.Lock()
 		for _, tap := range taps {
 			success = true
-			saltname := p.info[fd].Inode.Filename + "-" + strconv.Itoa(numBlock) + "-" + strconv.Itoa(p.getSeq())
-			err = tap.Store(saltname, p.cache[fd][numBlock])
+			filename := p.info[fd].Inode.Filename
+			saltname := filename + "-" + strconv.Itoa(numBlock) + "-" + strconv.Itoa(p.getSeq())
+			err = tap.Store(saltname, p.cache[filename][numBlock])
 			if err == nil {
 				p.info[fd].Inode.Blocks[numBlock] = append(p.info[fd].Inode.Blocks[numBlock], saltname)
 			}
@@ -519,7 +521,8 @@ func (p *puddleStoreClient) publish(fd int) error {
 
 func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
 	p.ClientMtx.Lock()
-	data, ok := p.cache[fd][numBlock]
+	filename := p.info[fd].Inode.Filename
+	data, ok := p.cache[filename][numBlock]
 	p.ClientMtx.Unlock()
 	if ok {
 		return data, nil

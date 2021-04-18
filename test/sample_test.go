@@ -539,6 +539,11 @@ func TestList(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = client.Remove("/b/a")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = client.Remove("/b")
 	if err != nil {
 		t.Fatal(err)
@@ -667,4 +672,38 @@ func TestReadBeyondEmpty(t *testing.T) {
 	}
 	client.Close(fd)
 	client.Remove("/a")
+}
+
+func TestWriteEdges(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Write(100, 100, []byte("string"))
+	if err == nil {
+		t.Errorf("this fd is invalid")
+	}
+	fd, err := client.Open("/a", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Write(fd, 100, []byte("string"))
+	if err == nil {
+		t.Errorf("this is readonly file")
+	}
+	client.Close(fd)
+	fd, err = client.Open("/c.txt", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Close(fd)
+	client.Remove("/a")
+	client.Remove("/c.txt")
+	client.Exit()
 }
