@@ -654,6 +654,60 @@ func TestWriteEdges(t *testing.T) {
 	client.Exit()
 }
 
+func TestMkdir3(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Mkdir("/p3")
+	client.Mkdir("/p3/lu")
+	client.Mkdir("/p3/tk")
+	client.Mkdir("/p3/tk/a3")
+	client.Remove("/p3/tk")
+	list, _ := client.List("/p3")
+	client.Remove("/p3/tk/a3")
+	client.Remove("/p3/tk")
+	client.Remove("/p3/lu")
+	client.Remove("/p3")
+	if len(list) != 0 && list[0] != "lu" {
+		t.Errorf("fail to delete recursive")
+	}
+}
+
+func TestReadOthersFile(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+	client1, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client2, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	in := "testtesttesttesttesttesttesttesttesttesttesttest"
+
+	if err := writeFile(client1, "/la30", 0, []byte(in)); err != nil {
+		t.Fatal(err)
+	}
+	var out []byte
+	if out, err = readFile(client2, "/la30", 0, 48); err != nil {
+		t.Fatal(err)
+	}
+	if in != string(out) {
+		t.Fatalf("Expected: %v %v, Got: %v %v", in, len(in), string(out), len(out))
+	}
+
+}
 func TestOpenSameFile(t *testing.T) {
 	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
 	if err != nil {
@@ -710,29 +764,4 @@ func TestConWrite(t *testing.T) {
 	}
 	client.Remove("/la17")
 	client.Exit()
-}
-
-func TestMkdir3(t *testing.T) {
-	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cluster.Shutdown()
-	client, err := cluster.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	client.Mkdir("/p3")
-	client.Mkdir("/p3/lu")
-	client.Mkdir("/p3/tk")
-	client.Mkdir("/p3/tk/a3")
-	client.Remove("/p3/tk")
-	list, _ := client.List("/p3")
-	client.Remove("/p3/tk/a3")
-	client.Remove("/p3/tk")
-	client.Remove("/p3/lu")
-	client.Remove("/p3")
-	if len(list) != 0 && list[0] != "lu" {
-		t.Errorf("fail to delete recursive")
-	}
 }
