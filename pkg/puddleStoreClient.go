@@ -338,7 +338,7 @@ func (p *puddleStoreClient) Read(fd int, offset, size uint64) ([]byte, error) {
 		data, err := p.readBlock(fd, int(i))
 		if len(data) == 0 || err != nil {
 			for i := 0; i < RETRY; i++ {
-				data, err = p.readBlock(fd, int(startBlock))
+				data, err = p.readBlock(fd, int(i))
 				if err == nil && len(data) != 0 {
 					break
 				}
@@ -407,15 +407,7 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		}
 	}
 	if startBlock == endBlock {
-		tmp, err := p.readBlock(fd, int(startBlock))
-		if err != nil {
-			for i := 0; i < RETRY; i++ {
-				tmp, err = p.readBlock(fd, int(startBlock))
-				if err == nil {
-					break
-				}
-			}
-		}
+		tmp, err := p.readBlockTry(fd, int(startBlock))
 		if err != nil {
 			return err
 		}
@@ -427,15 +419,8 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 		r = append(r, tmp[(offset+uint64(len(data)))%p.config.BlockSize:]...)
 		p.savecache(fd, int(startBlock), r)
 	} else {
-		tmp, err := p.readBlock(fd, int(startBlock))
-		if err != nil {
-			for i := 0; i < RETRY; i++ {
-				tmp, err = p.readBlock(fd, int(startBlock))
-				if err == nil {
-					break
-				}
-			}
-		}
+		tmp, err := p.readBlockTry(fd, int(startBlock))
+
 		if err != nil {
 			return err
 		}
@@ -452,15 +437,8 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 			data = data[p.config.BlockSize:]
 			p.savecache(fd, int(i), r)
 		}
-		tmp, err = p.readBlock(fd, int(endBlock))
-		if err != nil {
-			for i := 0; i < RETRY; i++ {
-				tmp, err = p.readBlock(fd, int(startBlock))
-				if err == nil {
-					break
-				}
-			}
-		}
+		tmp, err = p.readBlockTry(fd, int(endBlock))
+
 		if err != nil {
 			return err
 		}
@@ -515,6 +493,19 @@ func (p *puddleStoreClient) publish(fd int) error {
 	}
 	p.ClientMtx.Unlock()
 	return nil
+}
+
+func (p *puddleStoreClient) readBlockTry(fd, numBlock int) ([]byte, error) {
+	tmp, err := p.readBlock(fd, int(numBlock))
+	if err != nil {
+		for i := 0; i < RETRY; i++ {
+			tmp, err = p.readBlock(fd, int(numBlock))
+			if err == nil {
+				break
+			}
+		}
+	}
+	return tmp, err
 }
 
 func (p *puddleStoreClient) readBlock(fd, numBlock int) ([]byte, error) {
