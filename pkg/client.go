@@ -37,6 +37,9 @@ type Client interface {
 	// `List` lists file & directory names (not full names) under `path`. Returns err if not exists.
 	List(path string) ([]string, error)
 
+	Chmod(path string, ACL string) error
+
+	Login(UserID string) error
 	// Release zk connection. Students don't have this and may add one
 	Exit()
 }

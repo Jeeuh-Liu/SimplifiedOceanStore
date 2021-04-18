@@ -765,3 +765,33 @@ func TestConWrite(t *testing.T) {
 	client.Remove("/la17")
 	client.Exit()
 }
+
+func TestACL(t *testing.T) {
+	cluster, err := puddlestore.CreateCluster(puddlestore.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cluster.Shutdown()
+	client, err := cluster.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Login("user")
+	in := "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest"
+	err = writeFile(client, "/la18", 0, []byte(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Chmod("/la18", "45")
+	writeFile(client, "/la18", 0, []byte(in))
+	if err == nil {
+		t.Fatal("err")
+	}
+	client.Login("user2")
+	writeFile(client, "/la18", 0, []byte(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Remove("/la18")
+	client.Exit()
+}

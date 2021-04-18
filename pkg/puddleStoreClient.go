@@ -32,6 +32,7 @@ type puddleStoreClient struct {
 	children  []string
 	config    Config
 	seq       int
+	UserID    string
 }
 
 func (p *puddleStoreClient) init(config Config) {
@@ -40,6 +41,7 @@ func (p *puddleStoreClient) init(config Config) {
 	p.info = make(map[int]fileInfo)
 	p.children = make([]string, 0)
 	p.config = config
+	p.UserID = ""
 }
 
 func (p *puddleStoreClient) getFd() int {
@@ -146,6 +148,8 @@ func (p *puddleStoreClient) Open(path string, create, write bool) (int, error) {
 				Filename: path,
 				Blocks:   make(map[int][]string),
 				Size:     0,
+				ACL:      "55",
+				Owner:    p.UserID,
 			}
 			data, err := encodeInode(node)
 			if err != nil {
@@ -386,6 +390,13 @@ func (p *puddleStoreClient) Write(fd int, offset uint64, data []byte) error {
 	//handle edge case
 	if len(data) == 0 {
 		return nil
+	}
+	digit := 0
+	if p.UserID == "" || info.Inode.Owner != p.UserID {
+		digit = 1
+	}
+	if info.Inode.ACL[digit] == '4' {
+		return fmt.Errorf("no permission")
 	}
 	// if offset > info.Inode.Size, [info.Inode.Size, offset) should be filled with 0
 	// write data []byte
@@ -728,4 +739,29 @@ func (p *puddleStoreClient) readBlockTry(fd, numBlock int) ([]byte, error) {
 		}
 	}
 	return tmp, err
+}
+
+func (p *puddleStoreClient) Chmod(path string, ACL string) error {
+	p.lock()
+	_, state, err := p.Conn.Exists(path)
+	if err != nil {
+		return fmt.Errorf("no such path")
+	}
+	rawdata, _, err := p.Conn.Get(path)
+	if err != nil {
+		return fmt.Errorf("connect error")
+	}
+	node, err := decodeInode(rawdata)
+	node.ACL = ACL
+	data, err := encodeInode(*node)
+	_, err = p.Conn.Set(path, data, state.Version)
+	if err != nil {
+		return fmt.Errorf("connect error")
+	}
+	p.unlock()
+	return nil
+}
+
+func (p *puddleStoreClient) Login(UserID string) {
+	p.UserID = UserID
 }
